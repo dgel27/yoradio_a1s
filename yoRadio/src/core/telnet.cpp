@@ -256,7 +256,7 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
       }
       char sName[BUFLEN], sUrl[BUFLEN];
       int sOvol;
-      uint8_t c = 1;
+      uint16_t c = 1;
       while (file.available()) {
         if (config.parseCSV(file.readStringUntil('\n').c_str(), sName, sUrl, sOvol)) {
           printf(clientId, "#CLI.LISTNUM#: %*d: %s, %s\n", 3, c, sName, sUrl);

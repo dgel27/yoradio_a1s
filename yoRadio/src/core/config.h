@@ -40,9 +40,11 @@
 #define MAX_PLAY_MODE   1
 #define WEATHERKEY_LENGTH 58
 #define MDNS_LENGTH 24
+
 #if SDC_CS!=255
   #define USE_SD
 #endif
+
 #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
   #define ESP_ARDUINO_3 1
 #endif

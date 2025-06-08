@@ -6,6 +6,11 @@
 #include "sdmanager.h"
 #include "netserver.h"
 
+#ifdef ES8388_ENABLE
+  #include "../audioES8388/ES8388.h"
+#endif // ES8388_ENABLE
+
+
 Player player;
 QueueHandle_t playerQueue;
 
@@ -52,6 +57,31 @@ void Player::init() {
     if(VS1053_RST>0) ResetChip();
     begin();
   #endif
+
+  #ifdef ES8388_ENABLE
+  //++++++++ Add for Audio Kit 2.3 A247 with ES8388 codec
+  ES8388 es;
+  Serial.printf("Connect to ES8388 codec... ");
+  // Init I2C control communication with ES8388
+  while (not es.begin(ES8388_SDA, ES8388_SCL))
+  {
+      Serial.printf("Failed!\n");
+      delay(1000);
+  }
+  Serial.printf("OK\n");
+  // Init amlifiers volumes for all channels
+  es.volume(ES8388::ES_MAIN, ES8388_MAIN_VOLUME);
+  es.volume(ES8388::ES_OUT1, ES8388_OUT1_VOLUME);
+  es.volume(ES8388::ES_OUT2, ES8388_OUT2_VOLUME);
+  es.mute(ES8388::ES_MAIN, ES8388_MAIN_MUTE);
+  es.mute(ES8388::ES_OUT1, ES8388_OUT1_MUTE);
+  es.mute(ES8388::ES_OUT2, ES8388_OUT2_MUTE);
+//  pinMode(GPIO_PA_EN, OUTPUT);
+//  digitalWrite(GPIO_PA_EN, GPIO_PA_LEVEL);
+
+  //-------- for Audio Kit 2.3 A247 with ES8388 codec
+  #endif // ES8388_ENABLE
+  
   setBalance(config.store.balance);
   setTone(config.store.bass, config.store.middle, config.store.trebble);
   setVolume(0);
@@ -206,7 +236,7 @@ void Player::_play(uint16_t stationId) {
   display.putRequest(NEWSTATION);
   netserver.requestOnChange(STATION, 0);
   netserver.loop();
-  netserver.loop();
+  //netserver.loop();
   config.setSmartStart(0);
   bool isConnected = false;
   if(config.getMode()==PM_SDCARD && SDC_CS!=255){

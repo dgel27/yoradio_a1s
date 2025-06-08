@@ -18,6 +18,8 @@ extern __attribute__((weak)) void yoradio_on_setup();
 
 void setup() {
   Serial.begin(115200);
+//  pinMode(GPIO_PA_EN, OUTPUT);
+//  digitalWrite(GPIO_PA_EN, HIGH);
   if(REAL_LEDBUILTIN!=255) pinMode(REAL_LEDBUILTIN, OUTPUT);
   if (yoradio_on_setup) yoradio_on_setup();
   pm.on_setup();

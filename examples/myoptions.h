@@ -52,6 +52,28 @@ The connection tables are located here https://github.com/e2002/yoradio#connecti
 //#define I2S_LRC           25                /*  WSEL Left Right Clock */
 /******************************************/
 
+/* Enable ES8388 DAC (for ESP32-A1S module)*/
+//#define ES8388_ENABLE
+/* ES8388 PINS Settings for ESP32-A1S module */
+//#define I2S_DOUT         26
+//#define I2S_BCLK         27
+//#define I2S_LRC          25
+//#define I2S_DSIN         35
+//#define I2S_MCLK         0
+
+/* GPIOs for SPI  ES8388 */
+//#define ES_SPI_MOSI      23
+//#define ES_SPI_MISO      19
+//#define ES_SPI_SCK       18
+//#define ES_SPI_CS        5 
+
+/* I2C GPIOs for ES8388 */
+//#define ES_IIC_CLK       32
+//#define ES_IIC_DATA      33
+/* Amplifier enable */
+//#define GPIO_PA_EN       21
+
+
 /*  VS1053 VSPI PINS. VS1053 SCK must be connected to pin 18
                       VS1053 MISO must be connected to pin 19
                       VS1053 MOSI must be connected to pin 23  */

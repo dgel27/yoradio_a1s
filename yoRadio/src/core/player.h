@@ -8,6 +8,10 @@
   #include "../audioVS1053/audioVS1053Ex.h"
 #endif
 
+//#ifdef ES8388_ENABLE
+//  #include "../audioES8388/ES8388.h"
+//#endif  
+
 #ifndef MQTT_BURL_SIZE
   #define MQTT_BURL_SIZE  512
 #endif
