@@ -5,12 +5,21 @@
                   SD MISO must be connected to pin 12
                   SD MOSI must be connected to pin 13  */
 
-//#define SDC_CS  15    /* SDCARD CS pin */
+//#define SDC_CS  15    /* SDCARD CS pin 15,2,4,34 - ? */
 //#define SD_HSPI true	/* use HSPI for SD (miso=12, mosi=13, clk=14) instead of VSPI (by default) */
+// CMD=MOSI/2/, SCK=SCK/5/,MISO=D0/7/,VCC/4/, GND/3/,  SS(chip select)/1/
 
-#define BTN_LEFT			36 //KEY1 /VOL-/PREV
-#define BTN_CENTER			19 //KEY3 /STOP/PLAY
-#define BTN_RIGHT			5 //KEY6 /VOL+/NEXT
+//#define BTN_LEFT			36 //KEY1 /VOL-/PREV
+//#define BTN_CENTER			19 //KEY3 /STOP/PLAY
+//#define BTN_RIGHT			5 //KEY6 /VOL+/NEXT
+
+#define ENC_BTNR			12  //CLK
+#define ENC_BTNL			14  //DT 
+#define ENC_BTNB			15  //SW 
+//#define ENC_INTERNALPULLUP	false
+//#define ENC_HALFQUARD		true
+//#define LED_BUILTIN			2
+
 
 //#define BTN_UP  			19
 
@@ -49,7 +58,7 @@
 //#define GPIO_PA_EN       21   /* Amplifier GPIO */
 //#define GPIO_PA_LEVEL    HIGH /* Amplifier enable level */
 //#define SD_DETECT        34 // ?
-//#define HEP_DETECT       39 // ?
+//#define HP_DETECT        39 // ?
 /* The MUTE_PIN is inversed GPIO_PA_EN and implemented in YORADIO */
 #define MUTE_PIN        21   /*  MUTE Pin */
 #define MUTE_VAL        LOW  /*  Write this to MUTE_PIN when player is stopped */
@@ -66,17 +75,5 @@
 #define ES8388_MAIN_MUTE   false  // This works on Audio Kit
 #define ES8388_OUT1_MUTE   false // not muted
 #define ES8388_OUT2_MUTE   false // not muted Amplifier on Audio Kit
-
-
-
-
-
-//#define ENC2_BTNR			22  //CLK
-//#define ENC2_BTNL			14  //DT 
-//#define ENC2_BTNB			13  //SW 
-//#define ENC2_INTERNALPULLUP			true
-
-//#define IR_PIN	13
-
 
 #endif

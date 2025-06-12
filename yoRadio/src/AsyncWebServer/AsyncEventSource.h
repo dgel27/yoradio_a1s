@@ -18,34 +18,18 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 #ifndef ASYNCEVENTSOURCE_H_
-#define ASYNCEVENTSOURCE_H_
-#include "../core/options.h"
-#include <Arduino.h>
-#ifdef ESP32
-#include "AsyncTCP.h"
-#ifndef SSE_MAX_QUEUED_MESSAGES
-  #define SSE_MAX_QUEUED_MESSAGES 32
-#endif
-#else
-#include <ESPAsyncTCP.h>
-#define SSE_MAX_QUEUED_MESSAGES 8
-#endif
-#include "ESPAsyncWebServer.h"
+  #define ASYNCEVENTSOURCE_H_
+  #include "../core/options.h"
+  #include <Arduino.h>
+  #include "AsyncTCP.h"
+  #ifndef SSE_MAX_QUEUED_MESSAGES
+    #define SSE_MAX_QUEUED_MESSAGES 32
+  #endif
+ #include "ESPAsyncWebServer.h"
 
-#include "AsyncWebSynchronization.h"
+ #include "AsyncWebSynchronization.h"
 
-#ifdef ESP8266
-#include <Hash.h>
-#ifdef CRYPTO_HASH_h // include Hash.h from espressif framework if the first include was from the crypto library
-#include <../src/Hash.h>
-#endif
-#endif
-
-#ifdef ESP32
 #define DEFAULT_MAX_SSE_CLIENTS 8
-#else
-#define DEFAULT_MAX_SSE_CLIENTS 4
-#endif
 
 class AsyncEventSource;
 class AsyncEventSourceResponse;

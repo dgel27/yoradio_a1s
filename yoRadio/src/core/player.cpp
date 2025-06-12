@@ -69,10 +69,10 @@ void Player::init() {
       delay(1000);
   }
   Serial.printf("OK\n");
-  // Init amlifiers volumes for all channels
+  // Init amplifiers volumes for all channels
   es.volume(ES8388::ES_MAIN, ES8388_MAIN_VOLUME);
-  es.volume(ES8388::ES_OUT1, ES8388_OUT1_VOLUME);
-  es.volume(ES8388::ES_OUT2, ES8388_OUT2_VOLUME);
+//  es.volume(ES8388::ES_OUT1, ES8388_OUT1_VOLUME);
+//  es.volume(ES8388::ES_OUT2, ES8388_OUT2_VOLUME);
   es.mute(ES8388::ES_MAIN, ES8388_MAIN_MUTE);
   es.mute(ES8388::ES_OUT1, ES8388_OUT1_MUTE);
   es.mute(ES8388::ES_OUT2, ES8388_OUT2_MUTE);

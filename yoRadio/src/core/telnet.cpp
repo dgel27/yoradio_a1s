@@ -5,6 +5,9 @@
 #include "player.h"
 #include "network.h"
 #include "telnet.h"
+#ifdef ES8388_ENABLE
+  #include "../audioES8388/ES8388.h"
+#endif // ES8388_ENABLE   
 
 Telnet telnet;
 
@@ -468,5 +471,44 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
     WiFi.disconnect();
     return;
   }
+
+#ifdef ES8388_ENABLE
+ //uint8_t reg;
+  uint8_t src, vol;
+  ES8388 es;
+  if (sscanf(str, "esvol %d", &vol) == 1) {
+    printf(clientId, "#ES8388.VOL# set Main volume: %d \n> ", vol);
+    es.volume(ES8388::ES_MAIN, vol);
+      return;
+  }    
+  if (sscanf(str, "esvol1 %d", &vol) == 1) {
+    printf(clientId, "#ES8388.VOL1# set VOL1 volume: %d \n> ", vol);
+    es.volume(ES8388::ES_OUT1, vol);
+      return;
+  }
+  if (sscanf(str, "esvol2 %d", &vol) == 1) {
+    printf(clientId, "#ES8388.VOL2# set VOL2 volume: %d to: %d\n> ", vol);
+    es.volume(ES8388::ES_OUT2, vol);
+      return;
+  }    
+  if (sscanf(str, "esregw %d %d", &src, &vol) == 2) {
+    printf(clientId, "#ES8388.REGW# Write register: %d value: %d\n> ", src, vol);
+    es.write_reg(ES8388_ADDR, src, vol);
+      return;
+  }    
+  if (strcmp(str, "esdump") == 0 ) {
+      for(int i=0; i<255; i++) {
+          es.read_reg(ES8388_ADDR, i, vol);
+          printf(clientId, "Read REG: %d VAL: %d bits: ", i, vol);
+          printf(clientId,PRINTF_BINARY_PATTERN_INT8 "\n", PRINTF_BYTE_TO_BINARY_INT8(vol));
+      }
+      printf(clientId,"\n\n>");
+//    es.read_reg(ES8388_ADDR, src, vol);
+//    printf(clientId, "#ES8388.REGR# Read register: %d value: %d\n> ", src, vol);
+      return;
+  }    
+      
+#endif //ES8388_ENABLE
+  
   telnet.printf(clientId, "##CMD_ERROR#\tunknown command <%s>\n> ", str);
 }
