@@ -66,12 +66,9 @@
 class ES8388
 {
 
-//    bool write_reg(uint8_t slave_add, uint8_t reg_add, uint8_t data);
-//    bool read_reg(uint8_t slave_add, uint8_t reg_add, uint8_t &data);
     bool identify(int sda, int scl, uint32_t frequency);
 
 public:
-    bool begin(int sda = -1, int scl = -1, uint32_t frequency = 400000U);
 
     enum ES8388_OUT
     {
@@ -80,8 +77,10 @@ public:
         ES_OUT2  // this is the additional gain for OUT2
     };
 
+    bool begin(int sda = -1, int scl = -1, uint32_t frequency = 400000U);
     void mute(const ES8388_OUT out, const bool muted);
     void volume(const ES8388_OUT out, const uint8_t vol);
+    void stereo_eff(const uint8_t eff);
     bool write_reg(uint8_t slave_add, uint8_t reg_add, uint8_t data);
     bool read_reg(uint8_t slave_add, uint8_t reg_add, uint8_t &data);
 };

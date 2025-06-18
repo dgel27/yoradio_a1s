@@ -85,6 +85,7 @@ struct theme_t {
   uint16_t plcurrentfill;
   uint16_t playlist[5];
 };
+
 struct config_t
 {
   uint16_t  config_set; //must be 4262
@@ -151,6 +152,21 @@ struct ircodes_t
 {
   unsigned int ir_set; //must be 4224
   uint64_t irVals[20][3];
+};
+#endif
+
+#ifdef ES8388_ENABLE
+struct es8388_t
+{
+    uint8_t es_master_vol;
+    uint8_t es_sereo_eff;
+    uint8_t es_vol1;
+    uint8_t es_vol2;
+    uint8_t es_bal1;
+    uint8_t es_bal2;
+    uint8_t es_mute1;
+    uint8_t es_mute2;
+    uint8_t es_mute_head_phone; 
 };
 #endif
 

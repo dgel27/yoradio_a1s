@@ -12,13 +12,18 @@
 #include <Update.h>
 #include <ESPmDNS.h>
 #ifdef USE_SD
-#include "sdmanager.h"
+  #include "sdmanager.h"
 #endif
 #ifndef MIN_MALLOC
-#define MIN_MALLOC 24112
+  #define MIN_MALLOC 24112
 #endif
 #ifndef NSQ_SEND_DELAY
   #define NSQ_SEND_DELAY       (TickType_t)100  //portMAX_DELAY?
+#endif
+
+#ifdef ES8388_ENABLE
+  #include "../audioES8388/ES8388.h"
+  ES8388 es;
 #endif
 
 //#define CORS_DEBUG
@@ -37,6 +42,7 @@ void handleHTTPArgs(AsyncWebServerRequest * request);
 void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len);
 
 bool  shouldReboot  = false;
+
 #ifdef MQTT_ROOT_TOPIC
 Ticker mqttplaylistticker;
 bool  mqttplaylistblock = false;
@@ -270,6 +276,7 @@ void NetServer::processQueue(){
                                                                 act += F("\"group_controls\",");
             if (ENC_BTNL != 255 || ENC2_BTNL != 255 || dbgact)  act += F("\"group_encoder\",");
             if (IR_PIN != 255 || dbgact)                        act += F("\"group_ir\",");
+            if (ES8388_ENABLE || dbgact)                        act += F("\"group_es8388\",");
           }
                                                                 act = act.substring(0, act.length() - 1);
           sprintf (wsbuf, "{\"act\":[%s]}", act.c_str());
@@ -583,6 +590,43 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
         }
         return;
       }
+
+
+#ifdef ES8388_ENABLE
+// Names from WEB:
+//         - esmastervol
+//         - esstereo
+//         - hpmutesp
+//         - esvol1
+//         - esch1bal
+//         - esvol2
+//         - esch2bal
+
+
+
+
+      if (strcmp(cmd, "esmastervol") == 0) {
+        int8_t valb = atoi(val);
+        es.volume(ES8388::ES_MAIN, valb);
+//        config.setTone(config.store.bass, config.store.middle, valb);
+//        netserver.requestOnChange(EQUALIZER, 0);
+        return;
+      }
+
+      if (strcmp(cmd, "esstereo") == 0) {
+        int8_t valb = atoi(val);
+        es.stereo_eff(valb);
+//        config.setTone(config.store.bass, config.store.middle, valb);
+//        netserver.requestOnChange(EQUALIZER, 0);
+        return;
+      }
+      
+
+
+#endif // ES8388_ENABLE     
+
+
+
       if (strcmp(cmd, "volsteps") == 0) {
         uint8_t valb = atoi(val);
         config.saveValue(&config.store.volsteps, valb);

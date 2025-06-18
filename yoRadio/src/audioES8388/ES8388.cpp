@@ -146,6 +146,9 @@ bool ES8388::begin(int sda, int scl, uint32_t frequency)
         /* Disable ADC for both channels */
         res &= write_reg(ES8388_ADDR, ES8388_ADCPOWER, 0xff); // ?
 
+        /* Stero effect */
+        res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL7, 0x12);
+
         /* power up and enable DAC; power up ADC (no MIC bias) */
 //        res &= write_reg(ES8388_ADDR, ES8388_DACPOWER, 0x3c); // OK
 //        res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL3, 0x00);
@@ -251,6 +254,16 @@ void ES8388::volume(const ES8388_OUT out, const uint8_t vol)
     write_reg(ES8388_ADDR, lreg, vol_val);
     write_reg(ES8388_ADDR, rreg, vol_val);
 }
+
+void ES8388::stereo_eff(const uint8_t eff)
+{
+    uint8_t val;
+    read_reg(ES8388_ADDR, ES8388_DACCONTROL7, val);
+    val = (val & 0xE3) | (eff << 2);
+    write_reg(ES8388_ADDR, ES8388_DACCONTROL7, val);
+}
+
+
 
 /**
  * @brief Test if device with I2C address for ES8388 is connected to the I2C bus 

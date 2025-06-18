@@ -473,7 +473,6 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   }
 
 #ifdef ES8388_ENABLE
- //uint8_t reg;
   uint8_t src, vol;
   ES8388 es;
   if (sscanf(str, "esvol %d", &vol) == 1) {
@@ -497,14 +496,12 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
       return;
   }    
   if (strcmp(str, "esdump") == 0 ) {
-      for(int i=0; i<255; i++) {
+      for(int i=0; i<64; i++) {
           es.read_reg(ES8388_ADDR, i, vol);
-          printf(clientId, "Read REG: %d VAL: %d bits: ", i, vol);
+          printf(clientId, "Read REG: %2d    VAL: %3d     bits: ", i, vol);
           printf(clientId,PRINTF_BINARY_PATTERN_INT8 "\n", PRINTF_BYTE_TO_BINARY_INT8(vol));
       }
       printf(clientId,"\n\n>");
-//    es.read_reg(ES8388_ADDR, src, vol);
-//    printf(clientId, "#ES8388.REGR# Read register: %d value: %d\n> ", src, vol);
       return;
   }    
       

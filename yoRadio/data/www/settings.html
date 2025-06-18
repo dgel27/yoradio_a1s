@@ -18,12 +18,15 @@
       <div class="navitem group group_system hidden" data-target="group_system">system</div>
       <div class="navitem group group_display group_nextion hidden" data-target="group_display">screen</div>
       <div class="navitem group group_controls hidden" data-target="group_controls">controls</div>
+      <div class="navitem group group_es8388 hidden" data-target="group_es8388">es8388</div>
       <div class="navitem group group_timezone hidden" data-target="group_timezone">timezone</div>
       <div class="navitem group group_wifi hidden" data-target="group_wifi">wifi</div>
       <div class="navitem group group_weather hidden" data-target="group_weather">weather</div>
     </div>
     <div class="playerwrap">
-      <div class="settingsirwrap" id="settingscontent"><a name="system"></a>
+      <div class="settingsirwrap" id="settingscontent">
+
+      <a name="system"></a>
         <section class="group group_system hidden" id="group_system">
           <div class="title"><span>system</span></div><div class="reset" data-name="system"></div>
           <div class="flex-row">
@@ -50,7 +53,9 @@
             <div class="button apply" data-name="fwupdate" id="fwupdate">Firmware</div>
             <div class="button apply" data-name="webboard" id="webboard">Board</div>
           </div> 
-        </section><a name="screen"></a>
+        </section>
+
+        <a name="screen"></a>
         <section class="group group_display group_oled group_nextion hidden" id="group_display">
           <div class="title"><span>screen</span></div><div class="reset" data-name="screen"></div>
           <div class="flex-row">
@@ -105,6 +110,77 @@
             </div>
           </div>
         </section>
+
+        
+
+        <a name="ES8388"></a>
+        <section class="group group_es8388 hidden" id="group_es8388">
+
+          <div class="title"><span>ES8388 (Under Construction)</span></div><div class="reset" data-name="es8388"></div>
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Master Volume</span>
+              <span class="inputinfo" id="es_mastervolinfo">70</span>
+              <input type="range" id="es_mastervol" class="slider" data-slaveid="es_mastervol" name="esmastervol" min="0" max="199" value="1">
+            </div>
+          </div>
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Stereo Effect</span>
+              <span class="inputinfo" id="es_stereoinfo">4</span>
+              <input type="range" id="es_stereo" class="slider" data-slaveid="es_stereo" name="esstereo" min="0" max="7" value="1">
+            </div>
+          </div>
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">HeadPhones mute Speakers</span>
+              <div class="checkbox off nous" id="hpmutesp"></div>
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Speakers Volume</span>
+              <span class="inputinfo" id="es_vol1info">25</span>
+              <input type="range" id="es_vol1" class="slider" data-slaveid="es_vol1" name="esvol1" min="0" max="33" value="1">
+            </div>
+          </div>
+
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Speakers Ballance</span>
+              <span class="inputinfo" id="es_ch1balinfo">0</span>
+              <input type="range" id="es_ch1bal" class="slider" data-slaveid="es_ch1bal" name="esch1bal" min="-16" max="16" value="1">
+            </div>
+          </div>
+
+
+
+
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">HeadPhones Volume</span>
+              <span class="inputinfo" id="es_ch2balinfo">25</span>
+              <input type="range" id="es_ch2bal" class="slider" data-slaveid="es_ch2bal" name="esvol2" min="0" max="33" value="1">
+            </div>
+          </div>
+
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">HeadPhones Ballance</span>
+              <span class="inputinfo" id="es_ch2balinfo">0</span>
+              <input type="range" id="es_ch2bal" class="slider" data-slaveid="es_ch2bal" name="esch2bal" min="-16" max="16" value="1">
+            </div>
+          </div>
+
+         </section>
+
+
+       
+        <a name="controls"></a>
         <section class="group group_controls hidden" id="group_controls">
           <div class="title"><span>Controls</span></div><div class="reset" data-name="controls"></div>
           <div class="flex-row">
@@ -141,7 +217,9 @@
           <div class="flex-row group group_ir last hidden">
             <div class="button apply" data-name="setupir">IR Recorder</div>
           </div>
-        </section><a name="timezone"></a>
+        </section>
+
+        <a name="timezone"></a>
         <section class="group group_timezone hidden" id="group_timezone">
           <div class="title"><span>timezone</span></div><div class="reset" data-name="timezone"></div>
           <div class="flex-row">
@@ -167,7 +245,9 @@
           <div class="flex-row last">
             <div class="button apply hlbutton" data-name="applytz" id="applytz">Apply</div>
           </div>
-        </section><a name="wifi"></a>
+        </section>
+
+        <a name="wifi"></a>
         <section class="group group_wifi hidden" id="group_wifi">
           <div class="title"><span>Wi-Fi</span></div>
           <div class="flex-row credential">
@@ -225,7 +305,9 @@
             <div class="button group group_system hidden" data-name="wifiexport">Export</div>
             <div class="button hlbutton" data-name="wifiupload">Save &amp; Reboot</div>
           </div>
-        </section><a name="weather"></a>
+        </section>
+
+        <a name="weather"></a>
         <section class="group group_weather hidden" id="group_weather">
           <div class="title"><span>Weather</span></div><div class="reset" data-name="weather"></div>
           <div class="flex-row center">
@@ -250,7 +332,8 @@
           <div class="flex-row last">
             <div class="button apply hlbutton" data-name="applyweather">Apply</div>
           </div>
-        </section><a name="controls"></a>
+        </section>
+<!--        <a name="controls"></a> -->
         <div class="hr">&nbsp;</div>
       </div>
     </div><!--playerwrap-->
