@@ -43,30 +43,38 @@ SUPPORT_YORADIO = (
 DEFAULT_NAME = 'yoRadio'
 CONF_MAX_VOLUME = 'max_volume'
 CONF_ROOT_TOPIC = 'root_topic'
+CONF_FALLBACK_IMAGE = 'fallback_image'
+CONF_DEVICE_URL = 'device_url'
+DEFAULT_FALLBACK_IMAGE = 'https://raw.githubusercontent.com/e2002/yoradio/master/elogo.png'
 
 MEDIA_PLAYER_PLATFORM_SCHEMA = MEDIA_PLAYER_PLATFORM_SCHEMA.extend({
   vol.Required(CONF_ROOT_TOPIC, default="yoradio"): cv.string,
   vol.Optional(CONF_UNIQUE_ID, default="yoradio123"): cv.string,
   vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
-  vol.Optional(CONF_MAX_VOLUME, default='254'): cv.string
+  vol.Optional(CONF_MAX_VOLUME, default='254'): cv.string,
+  vol.Optional(CONF_FALLBACK_IMAGE, default=DEFAULT_FALLBACK_IMAGE): cv.string,
+  vol.Optional(CONF_DEVICE_URL, default=''): cv.string
 })
 
-def setup_platform(hass, config, add_devices, discovery_info=None):
+async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
   root_topic = config.get(CONF_ROOT_TOPIC)
   name = config.get(CONF_NAME)
   unique_id = config.get(CONF_UNIQUE_ID)
   max_volume = int(config.get(CONF_MAX_VOLUME, 254))
+  fallback_image = config.get(CONF_FALLBACK_IMAGE, DEFAULT_FALLBACK_IMAGE)
+  device_url = config.get(CONF_DEVICE_URL, '')
   playlist = []
-  api = yoradioApi(root_topic, hass, playlist)
-  add_devices([yoradioDevice(name, unique_id, max_volume, api)], True)
+  api = yoradioApi(root_topic, hass, playlist, device_url)
+  async_add_entities([yoradioDevice(name, unique_id, max_volume, fallback_image, device_url, api)], True)
 
 class yoradioApi():
-  def __init__(self, root_topic, hass, playlist):
+  def __init__(self, root_topic, hass, playlist, device_url):
     self.hass = hass
     self.mqtt = mqtt
-    self.root_topic = root_topic
+    self.root_topic = root_topic.strip('/')
     self.playlist = playlist
     self.playlisturl = ""
+    self.device_url = device_url  # user-configured; auto-detected from playlist if empty
 
   async def set_command(self, command):
     try:
@@ -106,6 +114,11 @@ class yoradioApi():
   async def load_playlist(self, msg):
     try:
       self.playlisturl = msg.payload
+      # Auto-detect device URL from playlist URL if not configured
+      if not self.device_url and self.playlisturl.startswith('http'):
+        from urllib.parse import urlparse
+        parsed = urlparse(self.playlisturl)
+        self.device_url = f"{parsed.scheme}://{parsed.netloc}/"
       file = await self.hass.async_add_executor_job(self.fetch_data)
     except uException as e:
       _LOGGER.error(f"Error load_playlist from {self.playlisturl}")
@@ -121,7 +134,7 @@ class yoradioApi():
           counter=counter+1
 
 class yoradioDevice(MediaPlayerEntity):
-  def __init__(self, name, unique_id, max_volume, api):
+  def __init__(self, name, unique_id, max_volume, fallback_image, device_url, api):
     self._name = name
     self.api = api
     self._state = MediaPlayerState.OFF
@@ -129,33 +142,68 @@ class yoradioDevice(MediaPlayerEntity):
     self._media_title = ''
     self._track_artist = ''
     self._track_album_name = ''
+    self._entity_picture = None
     self._volume = 0
     self._max_volume = max_volume
+    self._fallback_image = fallback_image
+    self._device_url = device_url
     self._connection = False
     self._unique_id = unique_id
 
+  @property
+  def device_info(self):
+    device_url = self.api.device_url or self._device_url
+    from homeassistant.helpers.device_registry import DeviceInfo
+    return DeviceInfo(
+        identifiers={("yoradio", self._unique_id)},
+        name=self._name,
+        manufacturer="yoRadio",
+        model="ESP32 Internet Radio",
+        configuration_url=device_url if device_url else None,
+    )
+
   async def async_added_to_hass(self):
     await asyncio.sleep(5)
-    await mqtt.async_subscribe(self.api.hass, self.api.root_topic+'/status', self.status_listener, 0, "utf-8")
-    await mqtt.async_subscribe(self.api.hass, self.api.root_topic+'/playlist', self.playlist_listener, 0, "utf-8")
-    await mqtt.async_subscribe(self.api.hass, self.api.root_topic+'/volume', self.volume_listener, 0, "utf-8")
-    await mqtt.async_subscribe(self.api.hass, self.api.root_topic+'/connection', self.connection_listener, 0, "utf-8")
+    for topic in ['/status', '/playlist', '/volume', '/connection']:
+      try:
+        listener = {
+          '/status': self.status_listener,
+          '/playlist': self.playlist_listener,
+          '/volume': self.volume_listener,
+          '/connection': self.connection_listener,
+        }[topic]
+        await mqtt.async_subscribe(self.api.hass, self.api.root_topic + topic, listener, 0, "utf-8")
+      except Exception as e:
+        _LOGGER.error("yoradio subscribe %s failed: %s", topic, e)
     
   async def status_listener(self, msg):
-    js = json.loads(msg.payload)
-    self._media_title = js['title']
-    self._track_artist = js['name']
-    if js['on']==1:
-      self._state = MediaPlayerState.PLAYING if js['status']==1 else MediaPlayerState.IDLE
+    try:
+      js = json.loads(msg.payload)
+    except (ValueError, TypeError):
+      _LOGGER.debug("Ignoring non-JSON status payload: %s", msg.payload)
+      return
+    if not isinstance(js, dict):
+      _LOGGER.debug("Ignoring unexpected status payload: %s", msg.payload)
+      return
+    self._media_title = js.get('title', '')
+    self._track_artist = js.get('name', '')
+    on = js.get('on', 0)
+    status = js.get('status', 0)
+    if on == 1:
+      self._state = MediaPlayerState.PLAYING if status == 1 else MediaPlayerState.IDLE
     else:
-      self._state = MediaPlayerState.PLAYING if js['status']==1 else MediaPlayerState.OFF
-    self._current_source = str(js['station']) + '. ' + js['name']
+      self._state = MediaPlayerState.PLAYING if status == 1 else MediaPlayerState.OFF
+    self._current_source = str(js.get('station', '')) + '. ' + js.get('name', '')
+    self._entity_picture = js.get('image_url') or None
     try:
       self.async_schedule_update_ha_state()
     except:
       pass
 
   async def playlist_listener(self, msg):
+    if not msg.payload or not str(msg.payload).startswith('http'):
+      _LOGGER.debug("Ignoring invalid playlist payload: %s", msg.payload)
+      return
     await self.api.load_playlist(msg)
     try:
       self.async_schedule_update_ha_state()
@@ -163,7 +211,11 @@ class yoradioDevice(MediaPlayerEntity):
       pass
 
   async def volume_listener(self, msg):
-    self._volume = int(msg.payload) / self._max_volume
+    try:
+      self._volume = int(msg.payload) / self._max_volume
+    except (ValueError, TypeError, ZeroDivisionError):
+      _LOGGER.debug("Ignoring invalid volume payload: %s", msg.payload)
+      return
     try:
       self.async_schedule_update_ha_state()
     except:
@@ -216,6 +268,18 @@ class yoradioDevice(MediaPlayerEntity):
   @property
   def media_album_name(self):
     return self._track_album_name
+
+  @property
+  def media_content_type(self):
+    return MediaType.MUSIC
+
+  @property
+  def entity_picture(self):
+    return self._entity_picture if self._entity_picture else self._fallback_image
+
+  @property
+  def media_image_remotely_accessible(self):
+    return True
 
   @property
   def state(self):
