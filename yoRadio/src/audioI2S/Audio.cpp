@@ -14,6 +14,8 @@
 #include "mp3_decoder/mp3_decoder.h"
 #include "aac_decoder/aac_decoder.h"
 #include "flac_decoder/flac_decoder.h"
+#include "vorbis_decoder/vorbis_decoder.h"
+#include "opus_decoder/opus_decoder.h"
 #include "../core/config.h"
 
 #ifdef SDFATFS_USED
@@ -313,6 +315,8 @@ void Audio::setDefaults() {
     MP3Decoder_FreeBuffers();
     FLACDecoder_FreeBuffers();
     AACDecoder_FreeBuffers();
+    VORBISDecoder_FreeBuffers();
+    OPUSDecoder_FreeBuffers();
     if(m_playlistBuff)   {free(m_playlistBuff);     m_playlistBuff = NULL;} // free if stream is not m3u8
     vector_clear_and_shrink(m_playlistURL);
     vector_clear_and_shrink(m_playlistContent);
@@ -499,6 +503,9 @@ bool Audio::connecttohost(const char* host, const char* user, const char* pwd) {
         if(endsWith(extension, ".wav"))   m_expectedCodec = CODEC_WAV;
         if(endsWith(extension, ".m4a"))   m_expectedCodec = CODEC_M4A;
         if(endsWith(extension, ".flac"))  m_expectedCodec = CODEC_FLAC;
+        if(endsWith(extension, ".ogg"))   m_expectedCodec = CODEC_OGG;
+        if(endsWith(extension, ".vorbis")) m_expectedCodec = CODEC_VORBIS;
+        if(endsWith(extension, ".opus"))   m_expectedCodec = CODEC_OGG_OPUS;
         if(endsWith(extension, ".asx"))  m_expectedPlsFmt = FORMAT_ASX;
         if(endsWith(extension, ".m3u"))  m_expectedPlsFmt = FORMAT_M3U;
         if(endsWith(extension, ".m3u8")) m_expectedPlsFmt = FORMAT_M3U8;
@@ -736,6 +743,18 @@ bool Audio::connecttoFS(fs::FS &fs, const char* path, uint32_t resumeFilePos) {
     if(endsWith(afn, ".flac")) {
       m_codec = CODEC_FLAC;
       if(audio_info) audio_info("format is flac");
+    }
+    if(endsWith(afn, ".ogg"))  {
+      m_codec = CODEC_OGG;
+      if(audio_info) audio_info("format is ogg");
+    }
+    if(endsWith(afn, ".vorbis"))  {
+      m_codec = CODEC_VORBIS;
+      if(audio_info) audio_info("format is vorbis");
+    }
+    if(endsWith(afn, ".opus"))  {
+      m_codec = CODEC_OGG_OPUS;
+      if(audio_info) audio_info("format is opus");
     }
 
     if(m_codec == CODEC_NONE) {
@@ -2116,7 +2135,7 @@ int Audio::read_OGG_Header(uint8_t *data, size_t len){
             }
         }
         else{
-            if(m_codec == CODEC_OGG_FLAC){
+            if(m_codec == CODEC_OGG_FLAC || m_codec == CODEC_VORBIS){
                 m_controlCounter = OGG_AMRDY;
             }
             else {
@@ -2234,6 +2253,22 @@ int Audio::read_OGG_Header(uint8_t *data, size_t len){
         return 0;
     }
     return 0;
+}
+//---------------------------------------------------------------------------------------------------------------------
+uint8_t Audio::determineOggCodec(uint8_t* data, uint16_t len) {
+    int idx = specialIndexOf(data, "OggS", 6);
+    if(idx != 0) {
+        if(specialIndexOf(data, "fLaC", 6)) return CODEC_FLAC;
+        return CODEC_NONE;
+    }
+    data += 27;
+    idx = specialIndexOf(data, "OpusHead", 40);
+    if(idx >= 0) { return CODEC_OGG_OPUS; }
+    idx = specialIndexOf(data, "fLaC", 40);
+    if(idx >= 0) { return CODEC_FLAC; }
+    idx = specialIndexOf(data, "vorbis", 40);
+    if(idx >= 0) { return CODEC_VORBIS; }
+    return CODEC_NONE;
 }
 //---------------------------------------------------------------------------------------------------------------------
 size_t Audio::process_m3u8_ID3_Header(uint8_t* packet){
@@ -3335,11 +3370,29 @@ void Audio::processWebStream() {
     }
     else { // not a webfile
         if(m_controlCounter != 100 && (m_codec == CODEC_OGG || m_codec == CODEC_OGG_FLAC)) {  //application/ogg
-            int res = read_OGG_Header(InBuff.getReadPtr(), InBuff.bufferFilled());
-            if(res >= 0) bytesDecoded = res;
-            else { // error, skip header
-                stopSong();
-                m_controlCounter = 100;
+            if(m_codec == CODEC_OGG) {
+                uint8_t codec = determineOggCodec(InBuff.getReadPtr(), InBuff.bufferFilled());
+                if(codec == CODEC_VORBIS) {
+                    m_codec = CODEC_VORBIS;
+                    if(!initializeDecoder()) { stopSong(); m_controlCounter = 100; }
+                    else { m_controlCounter = 100; eofHeader = true; }
+                }
+                else if(codec == CODEC_FLAC) {
+                    m_codec = CODEC_OGG_FLAC;
+                }
+                else if(codec == CODEC_OGG_OPUS) {
+                    m_codec = CODEC_OGG_OPUS;
+                    if(!initializeDecoder()) { stopSong(); m_controlCounter = 100; }
+                    else { m_controlCounter = 100; eofHeader = true; }
+                }
+            }
+            if(m_controlCounter != 100) {
+                int res = read_OGG_Header(InBuff.getReadPtr(), InBuff.bufferFilled());
+                if(res >= 0) bytesDecoded = res;
+                else { // error, skip header
+                    stopSong();
+                    m_controlCounter = 100;
+                }
             }
         }
         else{
@@ -3859,10 +3912,27 @@ bool Audio:: initializeDecoder(){
             InBuff.changeMaxBlockSize(m_frameSizeWav);
             break;
         case CODEC_OGG:
-            m_codec = CODEC_OGG;
-            AUDIO_INFO("ogg not supported");
-            AUDIO_ERROR("ogg not supported");
-            goto exit;
+            // the real codec (vorbis/flac/opus) is determined in read_OGG_Header()
+            break;
+        case CODEC_VORBIS:
+            if(!psramFound()){
+                AUDIO_INFO("VORBIS works only with PSRAM!");
+                goto exit;
+            }
+            if(!VORBISDecoder_AllocateBuffers()) {
+                AUDIO_INFO("The VORBISDecoder could not be initialized");
+                goto exit;
+            }
+            InBuff.changeMaxBlockSize(m_frameSizeVORBIS);
+            AUDIO_INFO("VORBISDecoder has been initialized, free Heap: %u bytes", ESP.getFreeHeap());
+            break;
+        case CODEC_OGG_OPUS:
+            if(!OPUSDecoder_AllocateBuffers()) {
+                AUDIO_INFO("The OPUSDecoder could not be initialized");
+                goto exit;
+            }
+            InBuff.changeMaxBlockSize(m_frameSizeOPUS);
+            AUDIO_INFO("OPUSDecoder has been initialized, free Heap: %u bytes", ESP.getFreeHeap());
             break;
         default:
             goto exit;
@@ -3965,6 +4035,11 @@ bool Audio::parseContentType(char* ct) {
     else if(!strcmp(ct, "video/x-ms-asf"))   ct_val = CT_ASX;
 
     else if(!strcmp(ct, "application/ogg"))  ct_val = CT_OGG;
+    else if(!strcmp(ct, "audio/ogg"))       ct_val = CT_OGG;
+    else if(!strcmp(ct, "application/vorbis")) ct_val = CT_OGG;
+    else if(!strcmp(ct, "audio/vorbis"))       ct_val = CT_OGG;
+    else if(!strcmp(ct, "application/opus"))   ct_val = CT_OGG;
+    else if(!strcmp(ct, "audio/opus"))         ct_val = CT_OGG;
     else if(!strcmp(ct, "application/vnd.apple.mpegurl")) ct_val = CT_M3U8;
     else if(!strcmp(ct, "application/x-mpegurl")) ct_val =CT_M3U8;
 
@@ -4163,6 +4238,12 @@ int Audio::findNextSync(uint8_t* data, size_t len){
                               m_flacBitsPerSample, m_flacTotalSamplesInStream, m_audioDataSize);
         nextSync = FLACFindSyncWord(data, len);
     }
+    if(m_codec == CODEC_VORBIS) {
+        nextSync = VORBISFindSyncWord(data, len);
+    }
+    if(m_codec == CODEC_OGG_OPUS) {
+        nextSync = OPUSFindSyncWord(data, len);
+    }
     if(nextSync == -1) {
          if(audio_info && swnf == 0) audio_info("syncword not found");
          if(m_codec == CODEC_OGG_FLAC){
@@ -4213,6 +4294,8 @@ int Audio::sendBytes(uint8_t* data, size_t len) {
         case CODEC_M4A:      ret = AACDecode(data, &bytesLeft, m_outBuff);    break;
         case CODEC_FLAC:     ret = FLACDecode(data, &bytesLeft, m_outBuff);   break;
         case CODEC_OGG_FLAC: ret = FLACDecode(data, &bytesLeft, m_outBuff);   break; // FLAC webstream wrapped in OGG
+        case CODEC_VORBIS:     ret = VORBISDecode(data, &bytesLeft, m_outBuff);   break;
+        case CODEC_OGG_OPUS:   ret = OPUSDecode(data, &bytesLeft, m_outBuff);     break;
         default: {log_e("no valid codec found codec = %d", m_codec); stopSong();}
     }
 
@@ -4238,7 +4321,22 @@ int Audio::sendBytes(uint8_t* data, size_t len) {
         return bytesDecoded;
     }
     else{  // ret>=0
-        if(f_setDecodeParamsOnce){
+        if(m_codec == CODEC_MP3){
+            m_validSamples = MP3GetOutputSamps() / getChannels();
+        }
+        if((m_codec == CODEC_AAC) || (m_codec == CODEC_M4A)){
+            m_validSamples = AACGetOutputSamps() / getChannels();
+        }
+        if((m_codec == CODEC_FLAC) || (m_codec == CODEC_OGG_FLAC)){
+            m_validSamples = FLACGetOutputSamps() / getChannels();
+        }
+        if(m_codec == CODEC_VORBIS){
+            m_validSamples = VORBISGetOutputSamps();
+        }
+        if(m_codec == CODEC_OGG_OPUS){
+            m_validSamples = OPUSGetOutputSamps();
+        }
+        if(f_setDecodeParamsOnce && m_validSamples){
             f_setDecodeParamsOnce = false;
             m_PlayingStartTime = millis();
 
@@ -4260,16 +4358,19 @@ int Audio::sendBytes(uint8_t* data, size_t len) {
                 setBitsPerSample(FLACGetBitsPerSample());
                 setBitrate(FLACGetBitRate());
             }
+            if(m_codec == CODEC_VORBIS){
+                setChannels(VORBISGetChannels());
+                setSampleRate(VORBISGetSampRate());
+                setBitsPerSample(VORBISGetBitsPerSample());
+                setBitrate(VORBISGetBitRate());
+            }
+            if(m_codec == CODEC_OGG_OPUS){
+                setChannels(OPUSGetChannels());
+                setSampleRate(OPUSGetSampRate());
+                setBitsPerSample(OPUSGetBitsPerSample());
+                setBitrate(OPUSGetBitRate());
+            }
             showCodecParams();
-        }
-        if(m_codec == CODEC_MP3){
-            m_validSamples = MP3GetOutputSamps() / getChannels();
-        }
-        if((m_codec == CODEC_AAC) || (m_codec == CODEC_M4A)){
-            m_validSamples = AACGetOutputSamps() / getChannels();
-        }
-        if((m_codec == CODEC_FLAC) || (m_codec == CODEC_OGG_FLAC)){
-            m_validSamples = FLACGetOutputSamps() / getChannels();
         }
     }
     compute_audioCurrentTime(bytesDecoded);
