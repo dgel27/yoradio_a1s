@@ -29,6 +29,8 @@ class Telnet {
     void printf(uint8_t id, const char *format, ...);
     void printf(const char *format, ...);
     void cleanupClients();
+    void disconnectClient(uint8_t clientId);
+    void printHelp(uint8_t clientId);
     void info();
   protected:
     WiFiServer server = WiFiServer(23);

@@ -161,9 +161,50 @@ void Telnet::printf(uint8_t id, const char *format, ...) {
   }
 }
 
+void Telnet::disconnectClient(uint8_t clientId) {
+  if (clientId >= MAX_TLN_CLIENTS) return;
+  if (clients[clientId]) {
+    clients[clientId].stop();
+  }
+}
+
 void Telnet::on_connect(const char* str, uint8_t clientId) {
   Serial.printf("Telnet: [%d] %s connected\n", clientId, str);
-  print(clientId, "\nWelcome to ёRadio!\n(Use ^] + q  to disconnect.)\n> ");
+  print(clientId, "\nWelcome to ёRadio!\n(Use ^] + q  to disconnect. Type 'help' for commands.)\n> ");
+}
+
+void Telnet::printHelp(uint8_t clientId) {
+  printf(clientId, "Available commands:\n");
+  printf(clientId, "  help                   Show this help\n");
+  printf(clientId, "  quit | bye | exit      Disconnect this session\n");
+  printf(clientId, "  prev | next | toggle   Station prev/next, play/pause\n");
+  printf(clientId, "  stop | start           Stop / resume playback\n");
+  printf(clientId, "  play <n>               Play station number n\n");
+  printf(clientId, "  vol                    Show volume\n");
+  printf(clientId, "  vol <0-254> | vol+ | vol-  Set / step volume\n");
+  printf(clientId, "  info | list            Player info / station list\n");
+  printf(clientId, "  audioinfo [0|1]        Show / set audioinfo output\n");
+  printf(clientId, "  smartstart [0|1]       Show / set smartstart\n");
+  printf(clientId, "  date | time            Sync and show time\n");
+  printf(clientId, "  tzo [h[:m]]            Show / set timezone offset\n");
+  printf(clientId, "  dspon <0|1>            Display on/off\n");
+  printf(clientId, "  dim <0-100>            Display brightness\n");
+  printf(clientId, "  sleep <for> [after]    Sleep timer, minutes\n");
+  #ifdef USE_SD
+  printf(clientId, "  mode <0|1|2>           0=WEB, 1=SD card, 2=toggle\n");
+  #endif
+  printf(clientId, "  version | heap         Firmware version / free heap\n");
+  printf(clientId, "  wifi                   Scan networks\n");
+  printf(clientId, "  wifi.status | wifi.rssi  Connection status / signal\n");
+  printf(clientId, "  wifi.con | wifi.station  Saved networks / current\n");
+  printf(clientId, "  wifi <ssid> <pass>      Save network, reboot\n");
+  printf(clientId, "  discon                 Disconnect wifi\n");
+  printf(clientId, "  boot | reset           Reboot / factory reset (!)\n");
+  #ifdef ES8388_ENABLE
+  printf(clientId, "  esvol <n> | esvol1 <n> | esvol2 <n>  ES8388 volumes\n");
+  printf(clientId, "  esregw <reg> <val> | esdump  ES8388 register debug\n");
+  #endif
+  printf(clientId, "Most commands also accept the cli. prefix and (args) form.\n> ");
 }
 
 void Telnet::info() {
@@ -186,6 +227,14 @@ void Telnet::info() {
 
 void Telnet::on_input(const char* str, uint8_t clientId) {
   if (strlen(str) == 0) return;
+  if (strcmp(str, "quit") == 0 || strcmp(str, "bye") == 0 || strcmp(str, "exit") == 0) {
+    disconnectClient(clientId);
+    return;
+  }
+  if (strcmp(str, "help") == 0) {
+    printHelp(clientId);
+    return;
+  }
   if(network.status == CONNECTED){
     if (strcmp(str, "cli.prev") == 0 || strcmp(str, "prev") == 0) {
       player.prev();
