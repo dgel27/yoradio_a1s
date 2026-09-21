@@ -1021,6 +1021,14 @@ void handleHTTPArgs(AsyncWebServerRequest * request) {
       commandFound=true;
       DBGVB("[%s] play=%d", __func__, id);
     }
+    if (request->hasArg("burl")) {
+      AsyncWebParameter* p = request->getParam("burl", request->method() == HTTP_POST);
+      if (p->value().length() + 1 <= sizeof(player.burl)) {
+        strlcpy(player.burl, p->value().c_str(), sizeof(player.burl));
+        DBGVB("[%s] burl=%s", __func__, player.burl);
+      }
+      commandFound=true;
+    }
     if (request->hasArg("vol")) {
       AsyncWebParameter* p = request->getParam("vol", request->method() == HTTP_POST);
       int v = atoi(p->value().c_str());
