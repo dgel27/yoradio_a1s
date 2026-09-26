@@ -1,0 +1,306 @@
+                                                                         ESP32-A1S Wi-Fi+BT SoC Module V1.0
+
+
+ ESP32-A1S Module
+
+
+
+
+                                                er
+ Features
+                                             ink
+- The smallest 802.11b/g/n Wi-Fi BT SoC Module
+                                                                   Overview
+                                                                         ESP32-A1S is an ultra-small, powerful
+                                                                   module. Built-in advanced low-power dual-core
+- Low power 32-bit CPU,can also serve the
+        h
+                                                                   32-bit CPU and Codec AC101 audio decoding
+ application processor
+                                                                   chip, can be widely used in various IoT
+- Built-in AC101 Codec audio decoding chip, can
+                                                                   applications, suitable for home smart devices,
+  support playing music and recording
+                                                                   smart Audio, story machine solutions, etc., are the
+     -T
+- Built-in 520 KB SRAM, external 4MPSRAM
+                                                                   ideal solution for IoT applications.
+- Supports UART/SPI/I2C/PWM/ADC/DAC
+- Support for firmware upgrade (FOTA)                                  ESP32-A1S      internal    circuit   is      highly
+
+- Antenna supports on-board antenna or IPEX                        integrated, supports a variety of peripherals, can
+
+ block output                                                      support secondary development, and quickly
+
+- Supports a variety of mainstream compression                     realize product differentiation.
+
+ and lossless audio formats, including M4A,                            ESP32-A1S adopts SMD package to realize
+Ai
+
+
+ AAC, FLAC, OGG, OPUS, MP3, WAV, etc.                              rapid production of products and provide
+- Supports audio input methods such as MIC and                     customers with high-reliability connection mode.
+ Line-in.                                                          It is especially suitable for modern, large-scale,
+                                                                   low-cost production methods, and is convenient
+                                                                   for various IoT hardware terminal applications.
+    Copyright © 2017 Shenzhen Ai-Thinker Technology Co., Ltd All Rights Reserved                      Page 1 of 6
+                                                                     ESP32-A1S Wi-Fi+BT SoC Module V1.0
+
+
+Product Specifications
+Module Model                     ESP32-A1S
+
+
+
+
+                                            er
+Package                          SMD-38
+Size                             32mm*19mm*3mm
+SPI Flash                        Default 32Mbit
+RAM                              520KB SRAM +4M PSRAM
+                                 Bluetooth 4.2 BR/EDR and BLE standards, support A2DP, AVRC
+Bluetooth
+                                 protocol, etc.
+
+
+
+
+                                         ink
+Wi-Fi                            802.11 b/g/n/        Support DLNA protocol
+                                 Support 1 channel headphone output and 1 channel left and right
+Audio Output
+                                 speaker output
+Audio Input                      Support LINEIN and 2-way MIC input
+Custom IO port                   14
+UART Baudrate                    Default 115200 bps
+Audio Format                     MP3 WAV             M4A AAC             FLAC OGG      OPUS
+Antenna                          Onboard PCB antenna or IPEX antenna
+                                 802.11b: 17±2 dBm (@11Mbps)
+Transmit Power                   802.11g: 14±2 dBm (@54Mbps)
+   h
+                                 802.11n: 13±2 dBm (@MCS7)
+                                 CCK, 1 Mbps : -90dBm
+                                 CCK, 11 Mbps: -85dBm
+Receiving Sensitivity            6 Mbps (1/2 BPSK): -88dBm
+-T
+                                 54 Mbps (3/4 64-QAM): -70dBm
+                                 MCS7 (65 Mbps, 72.2 Mbps): -67dBm
+Power Dissipation                350mA
+Security                         WPA/WPA2/WPA2-Enterprise/WPS
+Power Supply Range               3.3V±0.3V
+Operating Temperature            -20      ~ 85
+Storage Environment              -40      ~ 90      , < 90%RH
+Ai
+
+
+Weight                           2.5±0.05g
+
+
+
+
+Copyright © 2017 Shenzhen Ai-Thinker Technology Co., Ltd All Rights Reserved                   Page 2 of 6
+                                                                     ESP32-A1S Wi-Fi+BT SoC Module V1.0
+
+
+
+Module pin definition
+
+
+
+
+                                            er
+       GPIO                         Features                      Types                Remarks
+       TXD0                       GPIO1/CLKOUT2                     I/O
+                                                                                Download serial port
+       RXD0                       GPIO3/CLKOUT3                     I/O
+         EN                                                           I             Reset function
+        IO21                        U0CTS/VSPIQ                     I/O
+        IO22                       U0RTS/VSPIWP                     I/O
+
+
+    h   IO19
+        IO23
+        IO18
+         IO5
+     HPOUTR
+     HPOUTL
+      SPOLN
+      SPOLP
+      SPORN
+                                         ink
+                                   VSQIQ/U0CTS
+
+                                 VSPIIDHS1STROBE
+
+                                 VSPICLK/HS1DATA7
+
+                                      VSPICS0
+                                                                    I/O
+                                                                    I/O
+                                                                    I/O
+                                                                    I/O
+                                                                     O
+                                                                     O
+                                                                     O
+                                                                     O
+                                                                     O
+                                                                                 Headphone output
+
+                                                                                 Speaker left channel
+                                                                                        output
+                                                                                     Speaker right
+      SPORP                                                          O              channel output
+     LINEINL                                                          I
+                                                                                  Headphone input
+     LINEINR                                                          I
+  SENSOR_VN                    GPIO34/ADC1_3RTCIO3                    I
+ -T
+  SENSOR_VP                   GPIO36/ADC1_0/RTCIO0                    I
+        IO34                      ADC1_6/RTCIO4                       I
+                                                                                   Must be hanging
+         IO0                                                        I/O          when using internal
+                                                                                         codec
+                             ADC2_6/RTCIO16/SDCLK/HS
+        IO14                       PICKJ/HS2CLK
+                                                                    I/O
+Ai
+
+
+                             ADC2_5/RTCIO15/HSPIQ/SD
+        IO12                     DATA2/HS2DATA2
+                                                                    I/O
+                            ADC2_4/RTCIO14/HSPIID/SD
+        IO13                      DATA3/H2DATA3
+                                                                    I/O
+                            ADC2_3/RTCIO15/HSPICS0/S
+        IO15                      DCMD/HS2CMD
+                                                                    I/O
+         IO2                ADC2_2/RTCIO12/SDDATA0/                 I/O
+Copyright © 2017 Shenzhen Ai-Thinker Technology Co., Ltd All Rights Reserved                   Page 3 of 6
+                                                                      ESP32-A1S Wi-Fi+BT SoC Module V1.0
+                                      HS2DATA0
+                              ADC2_3/RTCIO10/HSPIHD/S
+          IO4                    DDATA1/HS2DATA1
+                                                                     I/O
+        HBIAS                                                         O             MIC2 control pin
+
+
+
+
+                                             er
+       MIC2N                                                           I
+                                                                                        MIC2 input
+       MIC2P                                                           I
+       MBIAS                                                          O             MIC1 control pin
+       MIC1P                                                           I
+                                                                                        MIC1 input
+       MIC1N                                                           I
+
+
+
+ Strapping pin
+
+
+
+PIN
+GPIO0
+GPIO2
+
+
+PIN
+     h                       Default
+                             Pull up
+                             Pull down
+                                          ink
+                                          System startup mode
+                                                            Normal operation
+                                                            NC
+                                                            Irrelevant item
+                                 Built-in LDO (VDD_SDIO) voltage
+                             Default                        3.3V
+                                                                                    Download
+                                                                                    0
+                                                                                    0
+
+
+                                                                                    1.8V
+MTDI/GPIO12                  Pull down                      0                       1
+
+
+Note: the built-in flash working voltage is 3.3 V, and the model chip with built-in flash needs
+to pull down or suspend the MTDI when it is powered on.
+  -T
+Ai
+
+
+ Copyright © 2017 Shenzhen Ai-Thinker Technology Co., Ltd All Rights Reserved                   Page 4 of 6
+                                                                     ESP32-A1S Wi-Fi+BT SoC Module V1.0
+
+
+Module schematic
+                                  ESP32 AC101 I2SPin connection
+
+
+
+
+                                            er
+                   AC101                                                       ESP32
+               I2S_SDOUT                                                       IO35
+                 I2S_SDIN                                                      IO25
+                 I2S_LRCK                                                      IO26
+                 I2S_BCLK                                                      IO27
+                 I2S_MCLK                                                       IO0
+
+
+                   AC101
+                     SCL
+                     SDA
+
+
+
+
+Minimum system diagram
+   h                                     ink
+                                 ESP32 AC101 I2C Pin connection
+                                                                               ESP32
+                                                                               IO32
+                                                                               IO33
+-T
+Ai
+
+
+Copyright © 2017 Shenzhen Ai-Thinker Technology Co., Ltd All Rights Reserved                   Page 5 of 6
+                                                                       ESP32-A1S Wi-Fi+BT SoC Module V1.0
+
+
+
+
+  Download
+
+
+
+
+                                              er
+http://wiki.ai-thinker.com/esp32-a1s
+
+
+
+  Contact US
+
+Shenzhen Ai-Thinker Technology Co., Ltd
+Address: 7/F, Fengze Building B, Huafeng Industrial Park 2th, Hangkong street,Xixiang Raod, Baoan, Shenzhen
+
+
+
+
+                                           ink
+China
+Website:www.ai-thinker.com                    Tel   0755-29162996                E-mail:support@aithinker.com
+
+      h
+   -T
+Ai
+
+
+  Copyright © 2017 Shenzhen Ai-Thinker Technology Co., Ltd All Rights Reserved                          Page 6 of 6
+
