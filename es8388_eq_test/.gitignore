@@ -1,0 +1,5 @@
+# Build artifacts of the throwaway ES8388 EQ lab. It is a scratch project,
+# nothing here belongs in the radio firmware.
+.pio/
+src/ES8388.cpp
+src/ES8388.h
