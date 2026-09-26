@@ -40,14 +40,18 @@
 /*****************************************************************************/
 
 /* Digital volume, attenuates BOTH analog outputs. Register 26/27.
-   0..192 where 192 = 0dB (loudest) and 0 = -96dB, 0.5dB per step. */
-#define ES8388_MAIN_VOLUME     75      // ~-58dB digital attenuation
+   0..192 where 192 = 0dB (loudest) and 0 = -96dB, 0.5dB per step.
+   NOTE: the driver used to cap this at 96 (-48dB), so the same "75" produced
+   register 24 (-12dB). With the corrected full range 75 would mean -58.5dB
+   (inaudible), so the value is re-based: 168 -> register 24 -> -12dB, which is
+   the level this fork ran at before. */
+#define ES8388_MAIN_VOLUME     168     // -12dB digital attenuation
 /* Analog output volume. Registers 46/47 (LOUT1/ROUT1) and 48/49 (LOUT2/ROUT2).
    0..33 where 30 = 0dB and 33 = +4.5dB, 1.5dB per step, 0 = -45dB.
    On the ESP32-A1S: OUT1 = headphone amp (HPOUTL/R), OUT2 = on-board
    speaker amp (SPOLP/N). Values above 33 are clamped. */
-#define ES8388_OUT1_VOLUME     25      // ~-16dB into the external amp
-#define ES8388_OUT2_VOLUME     25      // ~-16dB into the speaker amp
+#define ES8388_OUT1_VOLUME     30      // 0dB into the external amp
+#define ES8388_OUT2_VOLUME     30      // 0dB into the speaker amp
 
 #define ES8388_MAIN_MUTE       false   // digital mute
 #define ES8388_OUT1_MUTE       false   // headphone amp not muted

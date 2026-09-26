@@ -110,6 +110,12 @@ void Config::_setupVersion(){
       saveValue(&store.screensaverPlayingTimeout, (uint16_t)5);
       saveValue(&store.screensaverPlayingBlank, false);
       break;
+    case 4:
+      // v5 added store.spmute (user speaker/amp mute). Must be initialised
+      // explicitly: the field is new, so EEPROM holds junk there, and a junk
+      // value of non-zero would leave the amp permanently muted at boot.
+      saveValue(&store.spmute, false);
+      break;
     default:
       break;
   }
@@ -371,6 +377,7 @@ void Config::setDefaults() {
   store.skipPlaylistUpDown = false;
   store.screensaverPlayingEnabled = false;
   store.screensaverPlayingTimeout = 5;
+  store.spmute = false;
   eepromWrite(EEPROM_START, store);
 }
 
