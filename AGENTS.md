@@ -15,7 +15,7 @@ pio device monitor               # serial monitor (115200, esp32_exception_decod
 ```
 
 - Envs: `Yoradio_RELEASE_serialPort` (default), `Yoradio_RELEASE_OTA`, `Yoradio_JLINK_debug` (adds `-D FREE_JTAG_PINS`, reserves pins 12-15).
-- Board is defined in `yoRadio/boards/esp32-a1s.json` (custom: `BOARD_HAS_PSRAM`, `-mfix-esp32-psram-cache-issue`). Partition table is `partition_1.5Mapp_OTA_0.9Mfs.csv` (1.5MB app OTA x2 + 0.9MB SPIFFS). Filesystem is SPIFFS.
+- Board is defined in `yoRadio/boards/esp32-a1s.json` (custom: `BOARD_HAS_PSRAM`, `-mfix-esp32-psram-cache-issue`). Partition table is `partition_1.75Mapp_OTA_0.375Mfs.csv` (1.75MB app OTA x2 + 0.375MB SPIFFS). Filesystem is SPIFFS. Changing the table requires a full serial flash (bootloader + partitions + app + fs), not OTA.
 - Build artifacts go to `yoRadio/_BUILD/` and `yoRadio/_LIBDEPS/`. **There is no root `.gitignore`** — these are untracked but not ignored; never `git add` them (100MB+ of artifacts).
 
 ## Source layout
