@@ -72,7 +72,12 @@ class Player: public Audio {
     uint8_t volToI2S(uint8_t volume);
     void stopInfo();
     void setOutputPins(bool isPlaying);
+    /* User-controlled speaker/amp mute, OR'd into setOutputPins() */
+    void setSpeakerMute(bool muted);
+    bool speakerMute() const { return _spmute; }
     void setResumeFilePos(uint32_t pos) { _resumeFilePos = pos; }
+  private:
+    bool _spmute = false;
 };
 
 extern Player player;

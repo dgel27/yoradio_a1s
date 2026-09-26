@@ -23,7 +23,7 @@
 
 #ifdef ES8388_ENABLE
   #include "../audioES8388/ES8388.h"
-  ES8388 es;
+  extern ES8388 es; // single shared instance, owned by player.cpp
 #endif
 
 //#define CORS_DEBUG
@@ -593,37 +593,59 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
 
 
 #ifdef ES8388_ENABLE
-// Names from WEB:
-//         - esmastervol
-//         - esstereo
-//         - hpmutesp
-//         - esvol1
-//         - esch1bal
-//         - esvol2
-//         - esch2bal
-
-
-
+// Names from WEB. These must match the name= attributes in settings.html
+// (sliders) and the id= of the hpmutesp checkbox:
+//         - esmastervol  digital volume, both outputs (0-192)
+//         - esstereo    stereo enhancement 0-7
+//         - esvol1      LOUT1/ROUT1 (headphone amp) analog volume 0-33
+//         - esch1bal    LOUT1/ROUT1 L/R balance -6..+6
+//         - esvol2      LOUT2/ROUT2 (on-board speaker amp) analog volume 0-33
+//         - esch2bal    LOUT2/ROUT2 L/R balance -6..+6
+//         - hpmutesp    user speaker mute on/off (0/1)
 
       if (strcmp(cmd, "esmastervol") == 0) {
-        int8_t valb = atoi(val);
+        uint8_t valb = (uint8_t)atoi(val);
+        if (valb > 192) valb = 192;
         es.volume(ES8388::ES_MAIN, valb);
-//        config.setTone(config.store.bass, config.store.middle, valb);
-//        netserver.requestOnChange(EQUALIZER, 0);
         return;
       }
 
       if (strcmp(cmd, "esstereo") == 0) {
-        int8_t valb = atoi(val);
+        uint8_t valb = (uint8_t)atoi(val);
+        if (valb > 7) valb = 7;
         es.stereo_eff(valb);
-//        config.setTone(config.store.bass, config.store.middle, valb);
-//        netserver.requestOnChange(EQUALIZER, 0);
         return;
       }
-      
 
+      if (strcmp(cmd, "esvol1") == 0 || strcmp(cmd, "esvol2") == 0) {
+        uint8_t valb = (uint8_t)atoi(val);
+        if (valb > 33) valb = 33;
+        ES8388::ES8388_OUT out = (cmd[5] == '1') ? ES8388::ES_OUT1 : ES8388::ES_OUT2;
+        es.volume_l(out, valb);
+        es.volume_r(out, valb);
+        return;
+      }
 
-#endif // ES8388_ENABLE     
+      if (strcmp(cmd, "esch1bal") == 0 || strcmp(cmd, "esch2bal") == 0) {
+        int b = atoi(val);
+        if (b > 6) b = 6;
+        if (b < -6) b = -6;
+        uint8_t l = 30, r = 30;
+        if (b >= 0) { l = 30 + b; r = 30; } else { l = 30; r = 30 - b; }
+        ES8388::ES8388_OUT out = (cmd[5] == '1') ? ES8388::ES_OUT1 : ES8388::ES_OUT2;
+        es.volume_l(out, l);
+        es.volume_r(out, r);
+        return;
+      }
+
+      if (strcmp(cmd, "hpmutesp") == 0) {
+        int on = atoi(val);
+        config.setSpeakerMute(on != 0);
+        player.setSpeakerMute(on != 0);
+        return;
+      }
+
+#endif // ES8388_ENABLE
 
 
 

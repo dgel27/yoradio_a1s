@@ -8,6 +8,9 @@
 
 #ifdef ES8388_ENABLE
   #include "../audioES8388/ES8388.h"
+  // Single shared codec instance. player.cpp owns it; netserver.cpp and
+  // telnet.cpp use this one instead of declaring their own.
+  ES8388 es;
 #endif // ES8388_ENABLE
 
 
@@ -60,7 +63,6 @@ void Player::init() {
 
   #ifdef ES8388_ENABLE
   //++++++++ Add for Audio Kit 2.3 A247 with ES8388 codec
-  ES8388 es;
   Serial.printf("Connect to ES8388 codec... ");
   // Init I2C control communication with ES8388
   while (not es.begin(ES8388_SDA, ES8388_SCL))
@@ -69,15 +71,38 @@ void Player::init() {
       delay(1000);
   }
   Serial.printf("OK\n");
-  // Init amplifiers volumes for all channels
+
+  // Digital volume (attenuates both analog outputs)
   es.volume(ES8388::ES_MAIN, ES8388_MAIN_VOLUME);
-//  es.volume(ES8388::ES_OUT1, ES8388_OUT1_VOLUME);
-//  es.volume(ES8388::ES_OUT2, ES8388_OUT2_VOLUME);
+  // Analog output volumes: OUT1 = headphone amp, OUT2 = on-board speaker amp
+  es.volume_l(ES8388::ES_OUT1, ES8388_OUT1_VOLUME);
+  es.volume_r(ES8388::ES_OUT1, ES8388_OUT1_VOLUME);
+  es.volume_l(ES8388::ES_OUT2, ES8388_OUT2_VOLUME);
+  es.volume_r(ES8388::ES_OUT2, ES8388_OUT2_VOLUME);
+
   es.mute(ES8388::ES_MAIN, ES8388_MAIN_MUTE);
   es.mute(ES8388::ES_OUT1, ES8388_OUT1_MUTE);
   es.mute(ES8388::ES_OUT2, ES8388_OUT2_MUTE);
-//  pinMode(GPIO_PA_EN, OUTPUT);
-//  digitalWrite(GPIO_PA_EN, GPIO_PA_LEVEL);
+
+  // DAC Control 7
+  es.stereo_eff(ES8388_STEREO_EFF);
+  es.mono(ES8388_MONO);
+  es.vpp_scale(ES8388_VPP_SCALE);
+  // DAC Control 3: soft ramp
+  es.volume_ramp(ES8388_SOFT_RAMP ? ES8388_RAMP_RATE : 0);
+  // DAC Control 6
+  es.click_free(ES8388_CLICK_FREE);
+  es.deemphasis(ES8388_DEEMPHASIS);
+  es.channel_invert(ES8388_INVERT_L, ES8388_INVERT_R);
+  // DAC Control 23
+  es.output_impedance(ES8388_VROI);
+  // Output mixer line-in path
+  es.line_in_mix(ES8388_LINEIN_MIX, ES8388_LINEIN_GAIN);
+  // Mic PGA / input / bias (ADC stays off in playback)
+  es.mic_gain(ES8388_MIC_PGA);
+  es.mic_input(ES8388_MIC_INPUT);
+  es.mic_bias(ES8388_MIC_BIAS);
+  es.adc_power(false);
 
   //-------- for Audio Kit 2.3 A247 with ES8388 codec
   #endif // ES8388_ENABLE
@@ -85,6 +110,7 @@ void Player::init() {
   setBalance(config.store.balance);
   setTone(config.store.bass, config.store.middle, config.store.trebble);
   setVolume(0);
+  _spmute = config.store.spmute; // restore user speaker-mute
   _status = STOPPED;
   //setOutputPins(false);
   _volTimer=false;
@@ -209,8 +235,15 @@ void Player::loop() {
 
 void Player::setOutputPins(bool isPlaying) {
   if(REAL_LEDBUILTIN!=255) digitalWrite(REAL_LEDBUILTIN, LED_INVERT?!isPlaying:isPlaying);
-  bool _ml = MUTE_LOCK?!MUTE_VAL:(isPlaying?!MUTE_VAL:MUTE_VAL);
+  // MUTE_VAL is the level that mutes; the user speaker-mute flag forces it.
+  bool ampOn = isPlaying && !_spmute;
+  bool _ml = MUTE_LOCK ? !MUTE_VAL : (ampOn ? !MUTE_VAL : MUTE_VAL);
   if(MUTE_PIN!=255) digitalWrite(MUTE_PIN, _ml);
+}
+
+void Player::setSpeakerMute(bool muted) {
+  _spmute = muted;
+  setOutputPins(_status == PLAYING);
 }
 
 void Player::_play(uint16_t stationId) {

@@ -116,63 +116,57 @@
         <a name="ES8388"></a>
         <section class="group group_es8388 hidden" id="group_es8388">
 
-          <div class="title"><span>ES8388 (Under Construction)</span></div><div class="reset" data-name="es8388"></div>
+          <div class="title"><span>ES8388 codec</span></div><div class="reset" data-name="es8388"></div>
           <div class="flex-row">
             <div class="inputwrap">
-              <span class="inputtitle">Master Volume</span>
-              <span class="inputinfo" id="es_mastervolinfo">70</span>
-              <input type="range" id="es_mastervol" class="slider" data-slaveid="es_mastervol" name="esmastervol" min="0" max="199" value="1">
+              <span class="inputtitle">Master Volume (both outputs)</span>
+              <span class="inputinfo" id="es_mastervolinfo">75</span>
+              <input type="range" id="es_mastervol" class="slider" data-slaveid="es_mastervolinfo" name="esmastervol" min="0" max="192" value="75">
             </div>
           </div>
           <div class="flex-row">
             <div class="inputwrap">
               <span class="inputtitle">Stereo Effect</span>
               <span class="inputinfo" id="es_stereoinfo">4</span>
-              <input type="range" id="es_stereo" class="slider" data-slaveid="es_stereo" name="esstereo" min="0" max="7" value="1">
+              <input type="range" id="es_stereo" class="slider" data-slaveid="es_stereoinfo" name="esstereo" min="0" max="7" value="4">
             </div>
           </div>
           <div class="flex-row">
             <div class="inputwrap">
-              <span class="inputtitle">HeadPhones mute Speakers</span>
+              <span class="inputtitle">Mute speaker amp</span>
               <div class="checkbox off nous" id="hpmutesp"></div>
             </div>
           </div>
 
           <div class="flex-row">
             <div class="inputwrap">
-              <span class="inputtitle">Speakers Volume</span>
+              <span class="inputtitle">Headphone amp volume (LOUT1)</span>
               <span class="inputinfo" id="es_vol1info">25</span>
-              <input type="range" id="es_vol1" class="slider" data-slaveid="es_vol1" name="esvol1" min="0" max="33" value="1">
+              <input type="range" id="es_vol1" class="slider" data-slaveid="es_vol1info" name="esvol1" min="0" max="33" value="25">
             </div>
           </div>
 
-
           <div class="flex-row">
             <div class="inputwrap">
-              <span class="inputtitle">Speakers Ballance</span>
+              <span class="inputtitle">Headphone amp balance</span>
               <span class="inputinfo" id="es_ch1balinfo">0</span>
-              <input type="range" id="es_ch1bal" class="slider" data-slaveid="es_ch1bal" name="esch1bal" min="-16" max="16" value="1">
+              <input type="range" id="es_ch1bal" class="slider" data-slaveid="es_ch1balinfo" name="esch1bal" min="-6" max="6" value="0">
             </div>
           </div>
 
-
-
-
-
           <div class="flex-row">
             <div class="inputwrap">
-              <span class="inputtitle">HeadPhones Volume</span>
-              <span class="inputinfo" id="es_ch2balinfo">25</span>
-              <input type="range" id="es_ch2bal" class="slider" data-slaveid="es_ch2bal" name="esvol2" min="0" max="33" value="1">
+              <span class="inputtitle">Speaker amp volume (LOUT2)</span>
+              <span class="inputinfo" id="es_vol2info">25</span>
+              <input type="range" id="es_vol2" class="slider" data-slaveid="es_vol2info" name="esvol2" min="0" max="33" value="25">
             </div>
           </div>
 
-
           <div class="flex-row">
             <div class="inputwrap">
-              <span class="inputtitle">HeadPhones Ballance</span>
+              <span class="inputtitle">Speaker amp balance</span>
               <span class="inputinfo" id="es_ch2balinfo">0</span>
-              <input type="range" id="es_ch2bal" class="slider" data-slaveid="es_ch2bal" name="esch2bal" min="-16" max="16" value="1">
+              <input type="range" id="es_ch2bal" class="slider" data-slaveid="es_ch2balinfo" name="esch2bal" min="-6" max="6" value="0">
             </div>
           </div>
 

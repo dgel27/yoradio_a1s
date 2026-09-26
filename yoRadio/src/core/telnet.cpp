@@ -201,8 +201,15 @@ void Telnet::printHelp(uint8_t clientId) {
   printf(clientId, "  discon                 Disconnect wifi\n");
   printf(clientId, "  boot | reset           Reboot / factory reset (!)\n");
   #ifdef ES8388_ENABLE
-  printf(clientId, "  esvol <n> | esvol1 <n> | esvol2 <n>  ES8388 volumes\n");
-  printf(clientId, "  esregw <reg> <val> | esdump  ES8388 register debug\n");
+  printf(clientId, "  esvol <n>               ES8388 main digital volume 0-192\n");
+  printf(clientId, "  esvol1 <n>              ES8388 OUT1 (headphone) volume 0-33\n");
+  printf(clientId, "  esvol2 <n>              ES8388 OUT2 (speaker) volume 0-33\n");
+  printf(clientId, "  esch1bal <n>            ES8388 OUT1 L/R balance -6..+6\n");
+  printf(clientId, "  esch2bal <n>            ES8388 OUT2 L/R balance -6..+6\n");
+  printf(clientId, "  esstereo <n>            ES8388 stereo enhancement 0-7\n");
+  printf(clientId, "  esmono on|off           ES8388 mono/stereo\n");
+  printf(clientId, "  esspk mute|unmute       ES8388 speaker amp mute\n");
+  printf(clientId, "  esregr <reg> | esregw <reg> <val> | esdump   register debug\n");
   #endif
   printf(clientId, "Most commands also accept the cli. prefix and (args) form.\n> ");
 }
@@ -523,32 +530,73 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
 
 #ifdef ES8388_ENABLE
   uint8_t src, vol;
-  ES8388 es;
-  if (sscanf(str, "esvol %d", &vol) == 1) {
-    printf(clientId, "#ES8388.VOL# set Main volume: %d \n> ", vol);
-    es.volume(ES8388::ES_MAIN, vol);
-      return;
-  }    
-  if (sscanf(str, "esvol1 %d", &vol) == 1) {
-    printf(clientId, "#ES8388.VOL1# set VOL1 volume: %d \n> ", vol);
-    es.volume(ES8388::ES_OUT1, vol);
+  int svol;
+  extern ES8388 es; // single shared instance, owned by player.cpp
+  // NOTE: the specific esvolN / eschNbal forms must be tested BEFORE the
+  // generic "esvol", because sscanf("esvol %d") also matches "esvol1 30".
+  if (sscanf(str, "esvol1 %d", &svol) == 1) {
+    printf(clientId, "#ES8388.VOL1# set OUT1 (headphone) volume: %d (0-33) \n> ", svol);
+    es.volume_l(ES8388::ES_OUT1, (uint8_t)svol);
+    es.volume_r(ES8388::ES_OUT1, (uint8_t)svol);
       return;
   }
-  if (sscanf(str, "esvol2 %d", &vol) == 1) {
-    printf(clientId, "#ES8388.VOL2# set VOL2 volume: %d to: %d\n> ", vol);
-    es.volume(ES8388::ES_OUT2, vol);
+  if (sscanf(str, "esvol2 %d", &svol) == 1) {
+    printf(clientId, "#ES8388.VOL2# set OUT2 (speaker) volume: %d (0-33) \n> ", svol);
+    es.volume_l(ES8388::ES_OUT2, (uint8_t)svol);
+    es.volume_r(ES8388::ES_OUT2, (uint8_t)svol);
       return;
-  }    
+  }
+  if (sscanf(str, "esch1bal %d", &svol) == 1) {
+    printf(clientId, "#ES8388.BAL1# set OUT1 L/R balance: %d (-6..+6) \n> ", svol);
+    int b = svol; if (b > 6) b = 6; if (b < -6) b = -6;
+    uint8_t l = 30, r = 30;
+    if (b >= 0) { l = 30 + b; r = 30; } else { l = 30; r = 30 - b; }
+    es.volume_l(ES8388::ES_OUT1, l);
+    es.volume_r(ES8388::ES_OUT1, r);
+      return;
+  }
+  if (sscanf(str, "esch2bal %d", &svol) == 1) {
+    printf(clientId, "#ES8388.BAL2# set OUT2 L/R balance: %d (-6..+6) \n> ", svol);
+    int b = svol; if (b > 6) b = 6; if (b < -6) b = -6;
+    uint8_t l = 30, r = 30;
+    if (b >= 0) { l = 30 + b; r = 30; } else { l = 30; r = 30 - b; }
+    es.volume_l(ES8388::ES_OUT2, l);
+    es.volume_r(ES8388::ES_OUT2, r);
+      return;
+  }
+  if (sscanf(str, "esvol %d", &svol) == 1) {
+    printf(clientId, "#ES8388.VOL# set Main volume: %d (0-192) \n> ", svol);
+    es.volume(ES8388::ES_MAIN, (uint8_t)svol);
+      return;
+  }
+  if (sscanf(str, "esstereo %d", &svol) == 1) {
+    printf(clientId, "#ES8388.SE# set stereo enhancement: %d (0-7) \n> ", svol);
+    es.stereo_eff((uint8_t)svol);
+      return;
+  }
+  if (strcmp(str, "esmono on") == 0) { es.mono(true);  printf(clientId, "#ES8388.MONO# on\n> "); return; }
+  if (strcmp(str, "esmono off") == 0){ es.mono(false); printf(clientId, "#ES8388.MONO# off\n> "); return; }
+  if (strcmp(str, "esspk mute") == 0)  { config.setSpeakerMute(true);  player.setSpeakerMute(true);  printf(clientId, "#ES8388.SPK# muted\n> "); return; }
+  if (strcmp(str, "esspk unmute") == 0){ config.setSpeakerMute(false); player.setSpeakerMute(false); printf(clientId, "#ES8388.SPK# unmuted\n> "); return; }
   if (sscanf(str, "esregw %d %d", &src, &vol) == 2) {
     printf(clientId, "#ES8388.REGW# Write register: %d value: %d\n> ", src, vol);
     es.write_reg(ES8388_ADDR, src, vol);
       return;
   }    
+  if (sscanf(str, "esregr %d", &src) == 1) {
+    uint8_t v;
+    if (es.read_reg(ES8388_ADDR, src, v))
+      printf(clientId, "#ES8388.REGR# reg %d = 0x%02X (%d)\n> ", src, v, v);
+    else
+      printf(clientId, "#ES8388.REGR# read failed\n> ");
+      return;
+  }
   if (strcmp(str, "esdump") == 0 ) {
       for(int i=0; i<64; i++) {
-          es.read_reg(ES8388_ADDR, i, vol);
-          printf(clientId, "Read REG: %2d    VAL: %3d     bits: ", i, vol);
-          printf(clientId,PRINTF_BINARY_PATTERN_INT8 "\n", PRINTF_BYTE_TO_BINARY_INT8(vol));
+          uint8_t v = 0;
+          es.read_reg(ES8388_ADDR, i, v);
+          printf(clientId, "Read REG: %2d    VAL: %3d     bits: ", i, v);
+          printf(clientId,PRINTF_BINARY_PATTERN_INT8 "\n", PRINTF_BYTE_TO_BINARY_INT8(v));
       }
       printf(clientId,"\n\n>");
       return;

@@ -12,6 +12,11 @@
 
 Config config;
 
+// The stored config is addressed per-field from EEPROM_START and must fit
+// before EEPROM_SIZE, otherwise saveValue() would spill into adjacent EEPROM.
+static_assert(sizeof(config_t) <= (EEPROM_SIZE - EEPROM_START),
+              "config_t grew past the EEPROM region (EEPROM_START..EEPROM_SIZE)");
+
 void u8fix(char *src){
   char last = src[strlen(src)-1]; 
   if ((uint8_t)last >= 0xC2) src[strlen(src)-1]='\0';
@@ -726,6 +731,11 @@ void Config::setBrightness(bool dosave){
     saveValue(&store.dspon, store.dspon, true, true);
   }
 #endif
+}
+
+void Config::setSpeakerMute(bool muted){
+  store.spmute = muted;
+  saveValue(&store.spmute, store.spmute);
 }
 
 void Config::setDspOn(bool dspon, bool saveval){
