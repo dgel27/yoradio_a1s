@@ -72,37 +72,10 @@ void Player::init() {
   }
   Serial.printf("OK\n");
 
-  // Digital volume (attenuates both analog outputs)
-  es.volume(ES8388::ES_MAIN, ES8388_MAIN_VOLUME);
-  // Analog output volumes: OUT1 = headphone amp, OUT2 = on-board speaker amp
-  es.volume_l(ES8388::ES_OUT1, ES8388_OUT1_VOLUME);
-  es.volume_r(ES8388::ES_OUT1, ES8388_OUT1_VOLUME);
-  es.volume_l(ES8388::ES_OUT2, ES8388_OUT2_VOLUME);
-  es.volume_r(ES8388::ES_OUT2, ES8388_OUT2_VOLUME);
-
-  es.mute(ES8388::ES_MAIN, ES8388_MAIN_MUTE);
-  es.mute(ES8388::ES_OUT1, ES8388_OUT1_MUTE);
-  es.mute(ES8388::ES_OUT2, ES8388_OUT2_MUTE);
-
-  // DAC Control 7
-  es.stereo_eff(ES8388_STEREO_EFF);
-  es.mono(ES8388_MONO);
-  es.vpp_scale(ES8388_VPP_SCALE);
-  // DAC Control 3: soft ramp
-  es.volume_ramp(ES8388_SOFT_RAMP ? ES8388_RAMP_RATE : 0);
-  // DAC Control 6
-  es.click_free(ES8388_CLICK_FREE);
-  es.deemphasis(ES8388_DEEMPHASIS);
-  es.channel_invert(ES8388_INVERT_L, ES8388_INVERT_R);
-  // DAC Control 23
-  es.output_impedance(ES8388_VROI);
-  // Output mixer line-in path
-  es.line_in_mix(ES8388_LINEIN_MIX, ES8388_LINEIN_GAIN);
-  // Mic PGA / input / bias (ADC stays off in playback)
-  es.mic_gain(ES8388_MIC_PGA);
-  es.mic_input(ES8388_MIC_INPUT);
-  es.mic_bias(ES8388_MIC_BIAS);
-  es.adc_power(false);
+  // Apply the persisted runtime settings (seeded from myoptions.h on reset)
+  es_standby_wanted = config.store.es8388.es_standby;
+  es_sleeping = false;
+  applyEs8388Settings();
 
   //-------- for Audio Kit 2.3 A247 with ES8388 codec
   #endif // ES8388_ENABLE
@@ -110,9 +83,8 @@ void Player::init() {
   setBalance(config.store.balance);
   setTone(config.store.bass, config.store.middle, config.store.trebble);
   setVolume(0);
-  _spmute = config.store.spmute; // restore user speaker-mute
+  _spmute = config.store.spmute != 0; // restore user speaker-mute
   _status = STOPPED;
-  //setOutputPins(false);
   _volTimer=false;
   //randomSeed(analogRead(0));
   #if PLAYER_FORCE_MONO
@@ -122,6 +94,75 @@ void Player::init() {
   setConnectionTimeout(1700, 3700);
   Serial.println("done");
 }
+
+#ifdef ES8388_ENABLE
+/* Set one analog output from a volume plus an L/R balance offset.
+   balance -6..+6: positive favours the left channel. */
+void Player::setEs8388Out(ES8388::ES8388_OUT out, uint8_t vol, int8_t balance)
+{
+    uint8_t base = vol > 33 ? 33 : vol;
+    int b = balance;
+    if (b > 6) b = 6;
+    if (b < -6) b = -6;
+    int l = base, r = base;
+    if (b > 0) l = base + b; else if (b < 0) r = base - b;
+    if (l > 33) l = 33;
+    if (r > 33) r = 33;
+    es.volume_l(out, (uint8_t)l);
+    es.volume_r(out, (uint8_t)r);
+}
+
+/* Push every persisted ES8388 setting to the chip. Called at boot and after
+   any web/telnet change, so runtime edits and the stored state stay in sync. */
+void Player::applyEs8388Settings()
+{
+    es8388_t &e = config.store.es8388;
+
+    // Volumes and mutes
+    es.volume(ES8388::ES_MAIN, e.es_master_vol);
+    setEs8388Out(ES8388::ES_OUT1, e.es_vol1, e.es_bal1);
+    setEs8388Out(ES8388::ES_OUT2, e.es_vol2, e.es_bal2);
+    es.mute(ES8388::ES_MAIN, e.es_mute_main);
+    es.mute(ES8388::ES_OUT1, e.es_mute1);
+    es.mute(ES8388::ES_OUT2, e.es_mute2);
+
+    // DAC Control 7 (0x1d): stereo enhancement, mono, Vpp scale
+    es.stereo_eff(e.es_stereo_eff > 7 ? 7 : e.es_stereo_eff);
+    es.mono(e.es_mono);
+    es.vpp_scale(e.es_vpp > 3 ? 3 : e.es_vpp);
+
+    // DAC Control 3 (0x19): soft volume ramp
+    es.volume_ramp(e.es_soft_ramp ? (e.es_ramp_rate > 3 ? 3 : e.es_ramp_rate) : 0);
+
+    // DAC Control 6 (0x1c): de-emphasis, click free, phase invert
+    es.deemphasis(e.es_deemph > 3 ? 3 : e.es_deemph);
+    es.click_free(e.es_clickfree);
+    es.channel_invert(e.es_invl, e.es_invr);
+
+    // DAC Control 23 (0x2d): output impedance reference
+    es.output_impedance(e.es_vroi);
+
+    // Output mixers: line-in contribution
+    es.line_in_mix(e.es_linein, e.es_linein_gain);
+
+    // ADC / microphone
+    es.mic_gain(e.es_mic_pga > 8 ? 8 : e.es_mic_pga);
+    es.mic_input(e.es_mic_sel > 2 ? 2 : e.es_mic_sel);
+    es.mic_bias(e.es_mic_bias);
+    es.adc_power(e.es_adc);
+}
+
+/* Enable/disable automatic standby. Turning it off wakes the codec at once if
+   it is currently parked, so the change is audible without a reboot. */
+void Player::setEs8388Standby(bool on)
+{
+    es_standby_wanted = on;
+    if (!on && es_sleeping) {
+        es.wake();
+        es_sleeping = false;
+    }
+}
+#endif
 
 void Player::sendCommand(playerRequestParams_t request){
   if(playerQueue==NULL) return;
@@ -239,6 +280,16 @@ void Player::setOutputPins(bool isPlaying) {
   bool ampOn = isPlaying && !_spmute;
   bool _ml = MUTE_LOCK ? !MUTE_VAL : (ampOn ? !MUTE_VAL : MUTE_VAL);
   if(MUTE_PIN!=255) digitalWrite(MUTE_PIN, _ml);
+#ifdef ES8388_ENABLE
+  // Optionally park the codec in standby while nothing is playing, and wake it
+  // again before the first sample of playback. Driven by the persisted
+  // es_standby flag so the user can toggle it without reflashing.
+  if (es_standby_wanted) {
+    if (isPlaying && es_sleeping) es.wake();
+    else if (!isPlaying && !es_sleeping) es.standby();
+    es_sleeping = !isPlaying;
+  }
+#endif
 }
 
 void Player::setSpeakerMute(bool muted) {

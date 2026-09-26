@@ -340,7 +340,18 @@ void NetServer::processQueue(){
                                   config.store.skipPlaylistUpDown); 
                                   break;
       case DSPON:         sprintf (wsbuf, "{\"dspontrue\":%d}", 1); break;
-      case STATION:       requestOnChange(STATIONNAME, clientId); requestOnChange(ITEM, clientId); break;
+      case GETES8388:
+#ifdef ES8388_ENABLE
+        {
+          es8388_t &e = config.store.es8388;
+          sprintf (wsbuf, "{\"esmv\":%d,\"esv1\":%d,\"esb1\":%d,\"esv2\":%d,\"esb2\":%d,\"esse\":%d,\"esmu\":%d,\"esvpp\":%d,\"esde\":%d,\"esmo\":%d,\"esra\":%d,\"esvr\":%d,\"esli\":%d,\"esad\":%d,\"espg\":%d,\"esmi\":%d,\"esmb\":%d,\"essb\":%d}",
+                                  e.es_master_vol, e.es_vol1, (int)e.es_bal1, e.es_vol2, (int)e.es_bal2,
+                                  e.es_stereo_eff, config.store.spmute, e.es_vpp, e.es_deemph,
+                                  e.es_mono, e.es_soft_ramp, e.es_vroi, e.es_linein, e.es_adc,
+                                  e.es_mic_pga, e.es_mic_sel, e.es_mic_bias, e.es_standby);
+        }
+#endif
+                                  break;      case STATION:       requestOnChange(STATIONNAME, clientId); requestOnChange(ITEM, clientId); break;
       case STATIONNAME:   sprintf (wsbuf, "{\"nameset\": \"%s\"}", config.station.name); break;
       case ITEM:          sprintf (wsbuf, "{\"current\": %d}", config.lastStation()); break;
       case TITLE:         sprintf (wsbuf, "{\"meta\": \"%s\"}", config.station.title); telnet.printf("##CLI.META#: %s\n> ", config.station.title); break;
@@ -419,6 +430,7 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
       if (strcmp(cmd, "gettimezone") == 0 ) { requestOnChange(GETTIMEZONE, clientId); return; }
       if (strcmp(cmd, "getcontrols") == 0 ) { requestOnChange(GETCONTROLS, clientId); return; }
       if (strcmp(cmd, "getweather") == 0  ) { requestOnChange(GETWEATHER, clientId);  return; }
+      if (strcmp(cmd, "getes8388") == 0  ) { requestOnChange(GETES8388, clientId);  return; }
       if (strcmp(cmd, "getactive") == 0   ) { requestOnChange(GETACTIVE, clientId);   return; }
       if (strcmp(cmd, "newmode") == 0     ) { newConfigMode = atoi(val); requestOnChange(CHANGEMODE, 0); return; }
       if (strcmp(cmd, "smartstart") == 0) {
@@ -594,54 +606,64 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
 
 #ifdef ES8388_ENABLE
 // Names from WEB. These must match the name= attributes in settings.html
-// (sliders) and the id= of the hpmutesp checkbox:
+// (sliders) and the id= of the hpmutesp checkbox. Each handler persists to
+// config.store.es8388 so the value survives a reboot.
 //         - esmastervol  digital volume, both outputs (0-192)
 //         - esstereo    stereo enhancement 0-7
 //         - esvol1      LOUT1/ROUT1 (headphone amp) analog volume 0-33
 //         - esch1bal    LOUT1/ROUT1 L/R balance -6..+6
 //         - esvol2      LOUT2/ROUT2 (on-board speaker amp) analog volume 0-33
 //         - esch2bal    LOUT2/ROUT2 L/R balance -6..+6
+//         - esmono, esvpp, esramp, esdeemph, eslinein, esadc, esmicpga,
+//           esmicin, esmicbias, esvroi
 //         - hpmutesp    user speaker mute on/off (0/1)
 
+      es8388_t &E = config.store.es8388;
+      uint8_t u8 = (uint8_t)atoi(val);
+      int   iv = atoi(val);
+
       if (strcmp(cmd, "esmastervol") == 0) {
-        uint8_t valb = (uint8_t)atoi(val);
-        if (valb > 192) valb = 192;
-        es.volume(ES8388::ES_MAIN, valb);
+        if (u8 > 192) u8 = 192;
+        config.saveValue(&E.es_master_vol, u8);
+        es.volume(ES8388::ES_MAIN, u8);
         return;
       }
-
       if (strcmp(cmd, "esstereo") == 0) {
-        uint8_t valb = (uint8_t)atoi(val);
-        if (valb > 7) valb = 7;
-        es.stereo_eff(valb);
+        if (u8 > 7) u8 = 7;
+        config.saveValue(&E.es_stereo_eff, u8);
+        es.stereo_eff(u8);
         return;
       }
-
       if (strcmp(cmd, "esvol1") == 0 || strcmp(cmd, "esvol2") == 0) {
-        uint8_t valb = (uint8_t)atoi(val);
-        if (valb > 33) valb = 33;
-        ES8388::ES8388_OUT out = (cmd[5] == '1') ? ES8388::ES_OUT1 : ES8388::ES_OUT2;
-        es.volume_l(out, valb);
-        es.volume_r(out, valb);
+        if (u8 > 33) u8 = 33;
+        bool one = (cmd[5] == '1');   // "esvol1" -> cmd[5] is the channel digit
+        if (one) config.saveValue(&E.es_vol1, u8); else config.saveValue(&E.es_vol2, u8);
+        player.setEs8388Out(one ? ES8388::ES_OUT1 : ES8388::ES_OUT2, u8, one ? E.es_bal1 : E.es_bal2);
         return;
       }
-
       if (strcmp(cmd, "esch1bal") == 0 || strcmp(cmd, "esch2bal") == 0) {
-        int b = atoi(val);
-        if (b > 6) b = 6;
-        if (b < -6) b = -6;
-        uint8_t l = 30, r = 30;
-        if (b >= 0) { l = 30 + b; r = 30; } else { l = 30; r = 30 - b; }
-        ES8388::ES8388_OUT out = (cmd[5] == '1') ? ES8388::ES_OUT1 : ES8388::ES_OUT2;
-        es.volume_l(out, l);
-        es.volume_r(out, r);
+        if (iv > 6) iv = 6;
+        if (iv < -6) iv = -6;
+        bool one = (cmd[4] == '1');   // "esch1bal" -> cmd[4] is the channel digit
+        if (one) config.saveValue(&E.es_bal1, (int8_t)iv); else config.saveValue(&E.es_bal2, (int8_t)iv);
+        player.setEs8388Out(one ? ES8388::ES_OUT1 : ES8388::ES_OUT2, one ? E.es_vol1 : E.es_vol2, (int8_t)iv);
         return;
       }
+      if (strcmp(cmd, "esmono") == 0)   { config.saveValue(&E.es_mono, (uint8_t)(u8!=0)); es.mono(u8!=0); return; }
+      if (strcmp(cmd, "esvpp") == 0)    { if(u8>3)u8=3; config.saveValue(&E.es_vpp, u8); es.vpp_scale(u8); return; }
+      if (strcmp(cmd, "esramp") == 0)   { config.saveValue(&E.es_soft_ramp, (uint8_t)(u8!=0)); es.volume_ramp(u8?E.es_ramp_rate:0); return; }
+      if (strcmp(cmd, "esdeemph") == 0) { if(u8>3)u8=3; config.saveValue(&E.es_deemph, u8); es.deemphasis(u8); return; }
+      if (strcmp(cmd, "esvroi") == 0)   { config.saveValue(&E.es_vroi, (uint8_t)(u8!=0)); es.output_impedance(u8!=0); return; }
+      if (strcmp(cmd, "eslinein") == 0) { config.saveValue(&E.es_linein, (uint8_t)(u8!=0)); es.line_in_mix(u8!=0, E.es_linein_gain); return; }
+      if (strcmp(cmd, "esadc") == 0)    { config.saveValue(&E.es_adc, (uint8_t)(u8!=0)); es.adc_power(u8!=0); return; }
+      if (strcmp(cmd, "esmicpga") == 0) { if(u8>8)u8=8; config.saveValue(&E.es_mic_pga, u8); es.mic_gain(u8); return; }
+      if (strcmp(cmd, "esmicin") == 0)  { if(u8>2)u8=2; config.saveValue(&E.es_mic_sel, u8); es.mic_input(u8); return; }
+      if (strcmp(cmd, "esmicbias") == 0){ config.saveValue(&E.es_mic_bias, (uint8_t)(u8!=0)); es.mic_bias(u8!=0); return; }
+      if (strcmp(cmd, "esstandby") == 0) { config.saveValue(&E.es_standby, (uint8_t)(u8!=0)); player.setEs8388Standby(u8!=0); return; }
 
       if (strcmp(cmd, "hpmutesp") == 0) {
-        int on = atoi(val);
-        config.setSpeakerMute(on != 0);
-        player.setSpeakerMute(on != 0);
+        config.setSpeakerMute(iv != 0);
+        player.setSpeakerMute(iv != 0);
         return;
       }
 
@@ -757,6 +779,16 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
           requestOnChange(GETCONTROLS, clientId);
           return;
         }
+#ifdef ES8388_ENABLE
+        if (strcmp(val, "es8388") == 0) {
+          config.setEs8388Defaults();
+          config.setSpeakerMute(false);
+          player.setSpeakerMute(false);
+          player.applyEs8388Settings();
+          requestOnChange(GETES8388, clientId);
+          return;
+        }
+#endif
       } /*  EOF RESETS  */
       if (strcmp(cmd, "volume") == 0) {
         uint8_t v = atoi(val);

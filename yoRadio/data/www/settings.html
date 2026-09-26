@@ -120,8 +120,8 @@
           <div class="flex-row">
             <div class="inputwrap">
               <span class="inputtitle">Master Volume (both outputs)</span>
-              <span class="inputinfo" id="es_mastervolinfo">75</span>
-              <input type="range" id="es_mastervol" class="slider" data-slaveid="es_mastervolinfo" name="esmastervol" min="0" max="192" value="75">
+              <span class="inputinfo" id="es_mastervolinfo">168</span>
+              <input type="range" id="es_mastervol" class="slider" data-slaveid="es_mastervolinfo" name="esmastervol" min="0" max="192" value="168">
             </div>
           </div>
           <div class="flex-row">
@@ -141,8 +141,8 @@
           <div class="flex-row">
             <div class="inputwrap">
               <span class="inputtitle">Headphone amp volume (LOUT1)</span>
-              <span class="inputinfo" id="es_vol1info">25</span>
-              <input type="range" id="es_vol1" class="slider" data-slaveid="es_vol1info" name="esvol1" min="0" max="33" value="25">
+              <span class="inputinfo" id="es_vol1info">30</span>
+              <input type="range" id="es_vol1" class="slider" data-slaveid="es_vol1info" name="esvol1" min="0" max="33" value="30">
             </div>
           </div>
 
@@ -157,8 +157,8 @@
           <div class="flex-row">
             <div class="inputwrap">
               <span class="inputtitle">Speaker amp volume (LOUT2)</span>
-              <span class="inputinfo" id="es_vol2info">25</span>
-              <input type="range" id="es_vol2" class="slider" data-slaveid="es_vol2info" name="esvol2" min="0" max="33" value="25">
+              <span class="inputinfo" id="es_vol2info">30</span>
+              <input type="range" id="es_vol2" class="slider" data-slaveid="es_vol2info" name="esvol2" min="0" max="33" value="30">
             </div>
           </div>
 
@@ -167,6 +167,87 @@
               <span class="inputtitle">Speaker amp balance</span>
               <span class="inputinfo" id="es_ch2balinfo">0</span>
               <input type="range" id="es_ch2bal" class="slider" data-slaveid="es_ch2balinfo" name="esch2bal" min="-6" max="6" value="0">
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">DAC Vpp scale</span>
+              <span class="inputinfo" id="es_vppinfo">2</span>
+              <input type="range" id="es_vpp" class="slider" data-slaveid="es_vppinfo" name="esvpp" min="0" max="3" value="2">
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">De-emphasis</span>
+              <span class="inputinfo" id="es_deemphinfo">0</span>
+              <input type="range" id="es_deemph" class="slider" data-slaveid="es_deemphinfo" name="esdeemph" min="0" max="3" value="0">
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Mono downmix</span>
+              <div class="checkbox off nous" id="esmono"></div>
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Soft volume ramp (click-free)</span>
+              <div class="checkbox off nous" id="esramp"></div>
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">High output impedance (40k)</span>
+              <div class="checkbox off nous" id="esvroi"></div>
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Mix line-in to outputs</span>
+              <div class="checkbox off nous" id="eslinein"></div>
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Power up ADC (record)</span>
+              <div class="checkbox off nous" id="esadc"></div>
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Mic preamp gain (+3dB steps)</span>
+              <span class="inputinfo" id="es_micpgainfo">3</span>
+              <input type="range" id="es_micpga" class="slider" data-slaveid="es_micpgainfo" name="esmicpga" min="0" max="8" value="3">
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Mic input</span>
+              <span class="inputinfo" id="es_micinin">0</span>
+              <input type="range" id="es_micin" class="slider" data-slaveid="es_micinin" name="esmicin" min="0" max="2" value="0">
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Mic bias (MBIAS)</span>
+              <div class="checkbox off nous" id="esmicbias"></div>
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Standby when stopped</span>
+              <div class="checkbox off nous" id="esstandby"></div>
             </div>
           </div>
 

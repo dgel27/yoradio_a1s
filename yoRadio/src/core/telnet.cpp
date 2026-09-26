@@ -207,6 +207,22 @@ void Telnet::printHelp(uint8_t clientId) {
   printf(clientId, "  esch1bal <n>            ES8388 OUT1 L/R balance -6..+6\n");
   printf(clientId, "  esch2bal <n>            ES8388 OUT2 L/R balance -6..+6\n");
   printf(clientId, "  esstereo <n>            ES8388 stereo enhancement 0-7\n");
+  printf(clientId, "  esvpp <n>               ES8388 DAC Vpp scale 0-3\n");
+  printf(clientId, "  esdeemph <n>            ES8388 de-emphasis 0-3\n");
+  printf(clientId, "  esramprate <n>          ES8388 soft-ramp rate 0-3\n");
+  printf(clientId, "  esramp on|off           ES8388 soft volume ramp\n");
+  printf(clientId, "  esvroi on|off           ES8388 output impedance 1.5k/40k\n");
+  printf(clientId, "  esclick on|off          ES8388 click-free power up/down\n");
+  printf(clientId, "  esinvl on|off           ES8388 invert left channel\n");
+  printf(clientId, "  esinvr on|off           ES8388 invert right channel\n");
+  printf(clientId, "  eslinein on|off         ES8388 mix line-in to outputs\n");
+  printf(clientId, "  eslingain <dB>          ES8388 line-in mix gain -15..+6\n");
+  printf(clientId, "  esadc on|off            ES8388 power up the ADC\n");
+  printf(clientId, "  esmicpga <n>            ES8388 mic preamp gain 0-8 (0..+24dB)\n");
+  printf(clientId, "  esmicin <n>             ES8388 mic input 0=LIN1 1=LIN2 2=diff\n");
+  printf(clientId, "  esmicbias on|off        ES8388 mic bias (MBIAS)\n");
+  printf(clientId, "  esstandby on|off        ES8388 standby while stopped\n");
+  printf(clientId, "  esreset                 ES8388 settings back to defaults\n");
   printf(clientId, "  esmono on|off           ES8388 mono/stereo\n");
   printf(clientId, "  esspk mute|unmute       ES8388 speaker amp mute\n");
   printf(clientId, "  esregr <reg> | esregw <reg> <val> | esdump   register debug\n");
@@ -532,52 +548,121 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   uint8_t src, vol;
   int svol;
   extern ES8388 es; // single shared instance, owned by player.cpp
+  es8388_t &E = config.store.es8388;
   // NOTE: the specific esvolN / eschNbal forms must be tested BEFORE the
   // generic "esvol", because sscanf("esvol %d") also matches "esvol1 30".
   if (sscanf(str, "esvol1 %d", &svol) == 1) {
+    if (svol < 0) svol = 0; if (svol > 33) svol = 33;
     printf(clientId, "#ES8388.VOL1# set OUT1 (headphone) volume: %d (0-33) \n> ", svol);
-    es.volume_l(ES8388::ES_OUT1, (uint8_t)svol);
-    es.volume_r(ES8388::ES_OUT1, (uint8_t)svol);
+    config.saveValue(&E.es_vol1, (uint8_t)svol);
+    player.setEs8388Out(ES8388::ES_OUT1, (uint8_t)svol, E.es_bal1);
       return;
   }
   if (sscanf(str, "esvol2 %d", &svol) == 1) {
+    if (svol < 0) svol = 0; if (svol > 33) svol = 33;
     printf(clientId, "#ES8388.VOL2# set OUT2 (speaker) volume: %d (0-33) \n> ", svol);
-    es.volume_l(ES8388::ES_OUT2, (uint8_t)svol);
-    es.volume_r(ES8388::ES_OUT2, (uint8_t)svol);
+    config.saveValue(&E.es_vol2, (uint8_t)svol);
+    player.setEs8388Out(ES8388::ES_OUT2, (uint8_t)svol, E.es_bal2);
       return;
   }
   if (sscanf(str, "esch1bal %d", &svol) == 1) {
+    if (svol < -6) svol = -6; if (svol > 6) svol = 6;
     printf(clientId, "#ES8388.BAL1# set OUT1 L/R balance: %d (-6..+6) \n> ", svol);
-    int b = svol; if (b > 6) b = 6; if (b < -6) b = -6;
-    uint8_t l = 30, r = 30;
-    if (b >= 0) { l = 30 + b; r = 30; } else { l = 30; r = 30 - b; }
-    es.volume_l(ES8388::ES_OUT1, l);
-    es.volume_r(ES8388::ES_OUT1, r);
+    config.saveValue(&E.es_bal1, (int8_t)svol);
+    player.setEs8388Out(ES8388::ES_OUT1, E.es_vol1, (int8_t)svol);
       return;
   }
   if (sscanf(str, "esch2bal %d", &svol) == 1) {
+    if (svol < -6) svol = -6; if (svol > 6) svol = 6;
     printf(clientId, "#ES8388.BAL2# set OUT2 L/R balance: %d (-6..+6) \n> ", svol);
-    int b = svol; if (b > 6) b = 6; if (b < -6) b = -6;
-    uint8_t l = 30, r = 30;
-    if (b >= 0) { l = 30 + b; r = 30; } else { l = 30; r = 30 - b; }
-    es.volume_l(ES8388::ES_OUT2, l);
-    es.volume_r(ES8388::ES_OUT2, r);
+    config.saveValue(&E.es_bal2, (int8_t)svol);
+    player.setEs8388Out(ES8388::ES_OUT2, E.es_vol2, (int8_t)svol);
       return;
   }
   if (sscanf(str, "esvol %d", &svol) == 1) {
+    if (svol < 0) svol = 0; if (svol > 192) svol = 192;
     printf(clientId, "#ES8388.VOL# set Main volume: %d (0-192) \n> ", svol);
+    config.saveValue(&E.es_master_vol, (uint8_t)svol);
     es.volume(ES8388::ES_MAIN, (uint8_t)svol);
       return;
   }
   if (sscanf(str, "esstereo %d", &svol) == 1) {
+    if (svol < 0) svol = 0; if (svol > 7) svol = 7;
     printf(clientId, "#ES8388.SE# set stereo enhancement: %d (0-7) \n> ", svol);
+    config.saveValue(&E.es_stereo_eff, (uint8_t)svol);
     es.stereo_eff((uint8_t)svol);
       return;
   }
-  if (strcmp(str, "esmono on") == 0) { es.mono(true);  printf(clientId, "#ES8388.MONO# on\n> "); return; }
-  if (strcmp(str, "esmono off") == 0){ es.mono(false); printf(clientId, "#ES8388.MONO# off\n> "); return; }
+  if (sscanf(str, "esvpp %d", &svol) == 1) {
+    if (svol < 0) svol = 0; if (svol > 3) svol = 3;
+    printf(clientId, "#ES8388.VPP# set DAC Vpp scale: %d (0=3.5V 1=4.0V 2=3.0V 3=2.5V) \n> ", svol);
+    config.saveValue(&E.es_vpp, (uint8_t)svol);
+    es.vpp_scale((uint8_t)svol);
+      return;
+  }
+  if (sscanf(str, "esdeemph %d", &svol) == 1) {
+    if (svol < 0) svol = 0; if (svol > 3) svol = 3;
+    printf(clientId, "#ES8388.DEEMPH# set de-emphasis: %d (0=off 1=32k 2=44.1k 3=48k) \n> ", svol);
+    config.saveValue(&E.es_deemph, (uint8_t)svol);
+    es.deemphasis((uint8_t)svol);
+      return;
+  }
+  if (sscanf(str, "esmicpga %d", &svol) == 1) {
+    if (svol < 0) svol = 0; if (svol > 8) svol = 8;
+    printf(clientId, "#ES8388.MICPGA# set mic preamp gain: %d (0..8 = 0..+24dB) \n> ", svol);
+    config.saveValue(&E.es_mic_pga, (uint8_t)svol);
+    es.mic_gain((uint8_t)svol);
+      return;
+  }
+  if (sscanf(str, "esmicin %d", &svol) == 1) {
+    if (svol < 0) svol = 0; if (svol > 2) svol = 2;
+    printf(clientId, "#ES8388.MICIN# set mic input: %d (0=LIN1 1=LIN2 2=diff) \n> ", svol);
+    config.saveValue(&E.es_mic_sel, (uint8_t)svol);
+    es.mic_input((uint8_t)svol);
+      return;
+  }
+  if (strcmp(str, "esmono on") == 0)   { config.saveValue(&E.es_mono,(uint8_t)1); es.mono(true);  printf(clientId, "#ES8388.MONO# on\n> "); return; }
+  if (strcmp(str, "esmono off") == 0)  { config.saveValue(&E.es_mono,(uint8_t)0); es.mono(false); printf(clientId, "#ES8388.MONO# off\n> "); return; }
+  if (strcmp(str, "esramp on") == 0)   { config.saveValue(&E.es_soft_ramp,(uint8_t)1); es.volume_ramp(E.es_ramp_rate); printf(clientId, "#ES8388.RAMP# on\n> "); return; }
+  if (strcmp(str, "esramp off") == 0)  { config.saveValue(&E.es_soft_ramp,(uint8_t)0); es.volume_ramp(0); printf(clientId, "#ES8388.RAMP# off\n> "); return; }
+  if (strcmp(str, "esvroi on") == 0)   { config.saveValue(&E.es_vroi,(uint8_t)1); es.output_impedance(true);  printf(clientId, "#ES8388.VROI# 40k\n> "); return; }
+  if (strcmp(str, "esvroi off") == 0)  { config.saveValue(&E.es_vroi,(uint8_t)0); es.output_impedance(false); printf(clientId, "#ES8388.VROI# 1.5k\n> "); return; }
+  if (strcmp(str, "eslinein on") == 0) { config.saveValue(&E.es_linein,(uint8_t)1); es.line_in_mix(true, E.es_linein_gain);  printf(clientId, "#ES8388.LINEIN# mixed in\n> "); return; }
+  if (strcmp(str, "eslinein off") == 0){ config.saveValue(&E.es_linein,(uint8_t)0); es.line_in_mix(false, E.es_linein_gain); printf(clientId, "#ES8388.LINEIN# off\n> "); return; }
+  if (strcmp(str, "esadc on") == 0)    { config.saveValue(&E.es_adc,(uint8_t)1); es.adc_power(true);  printf(clientId, "#ES8388.ADC# powered up\n> "); return; }
+  if (strcmp(str, "esadc off") == 0)   { config.saveValue(&E.es_adc,(uint8_t)0); es.adc_power(false); printf(clientId, "#ES8388.ADC# powered down\n> "); return; }
+  if (strcmp(str, "esmicbias on") == 0){ config.saveValue(&E.es_mic_bias,(uint8_t)1); es.mic_bias(true);  printf(clientId, "#ES8388.MICBIAS# on\n> "); return; }
+  if (strcmp(str, "esmicbias off") == 0){config.saveValue(&E.es_mic_bias,(uint8_t)0); es.mic_bias(false); printf(clientId, "#ES8388.MICBIAS# off\n> "); return; }
+  if (sscanf(str, "esramprate %d", &svol) == 1) {
+    if (svol < 0) svol = 0; if (svol > 3) svol = 3;
+    printf(clientId, "#ES8388.RAMPRATE# set soft-ramp rate: %d (0-3) \n> ", svol);
+    config.saveValue(&E.es_ramp_rate, (uint8_t)svol);
+    es.volume_ramp(E.es_soft_ramp ? (uint8_t)svol : 0);
+      return;
+  }
+  if (strcmp(str, "esclick on") == 0) { config.saveValue(&E.es_clickfree,(uint8_t)1); es.click_free(true);  printf(clientId, "#ES8388.CLICKFREE# on\n> "); return; }
+  if (strcmp(str, "esclick off") == 0){ config.saveValue(&E.es_clickfree,(uint8_t)0); es.click_free(false); printf(clientId, "#ES8388.CLICKFREE# off\n> "); return; }
+  if (strcmp(str, "esinvl on") == 0)  { config.saveValue(&E.es_invl,(uint8_t)1); es.channel_invert(true, E.es_invr);  printf(clientId, "#ES8388.INVL# invert L\n> "); return; }
+  if (strcmp(str, "esinvl off") == 0) { config.saveValue(&E.es_invl,(uint8_t)0); es.channel_invert(false, E.es_invr); printf(clientId, "#ES8388.INVL# normal\n> "); return; }
+  if (strcmp(str, "esinvr on") == 0)  { config.saveValue(&E.es_invr,(uint8_t)1); es.channel_invert(E.es_invl, true);  printf(clientId, "#ES8388.INVR# invert R\n> "); return; }
+  if (strcmp(str, "esinvr off") == 0) { config.saveValue(&E.es_invr,(uint8_t)0); es.channel_invert(E.es_invl, false); printf(clientId, "#ES8388.INVR# normal\n> "); return; }
+  if (sscanf(str, "eslingain %d", &svol) == 1) {
+    if (svol < -15) svol = -15; if (svol > 6) svol = 6;
+    printf(clientId, "#ES8388.LINGAIN# set line-in mix gain: %d dB (-15..+6) \n> ", svol);
+    config.saveValue(&E.es_linein_gain, (int8_t)svol);
+    es.line_in_mix(E.es_linein, (int8_t)svol);
+      return;
+  }
+  if (strcmp(str, "esstandby on") == 0) { config.saveValue(&E.es_standby,(uint8_t)1); player.setEs8388Standby(true);  printf(clientId, "#ES8388.STANDBY# on (codec sleeps when stopped)\n> "); return; }
+  if (strcmp(str, "esstandby off") == 0){ config.saveValue(&E.es_standby,(uint8_t)0); player.setEs8388Standby(false); printf(clientId, "#ES8388.STANDBY# off (codec stays awake)\n> "); return; }
   if (strcmp(str, "esspk mute") == 0)  { config.setSpeakerMute(true);  player.setSpeakerMute(true);  printf(clientId, "#ES8388.SPK# muted\n> "); return; }
   if (strcmp(str, "esspk unmute") == 0){ config.setSpeakerMute(false); player.setSpeakerMute(false); printf(clientId, "#ES8388.SPK# unmuted\n> "); return; }
+  if (strcmp(str, "esreset") == 0) {
+      config.setEs8388Defaults();
+      player.applyEs8388Settings();
+      printf(clientId, "#ES8388.RESET# settings restored to defaults\n> ");
+      return;
+  }
   if (sscanf(str, "esregw %d %d", &src, &vol) == 2) {
     printf(clientId, "#ES8388.REGW# Write register: %d value: %d\n> ", src, vol);
     es.write_reg(ES8388_ADDR, src, vol);

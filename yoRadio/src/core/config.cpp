@@ -72,6 +72,11 @@ void Config::init() {
   if(store.version>CONFIG_VERSION) store.version=1;
   while(store.version!=CONFIG_VERSION) _setupVersion();
   BOOTLOG("CONFIG_VERSION\t%d", store.version);
+  // Sanity-check single-byte fields every boot, not just on a version bump: a
+  // device that skipped a migration can be left holding junk, and for these
+  // fields junk means "muted" or "wrong volume". This firmware only ever writes
+  // 0 or 1, so anything else cannot be a deliberate user choice.
+  if (store.spmute > 1) saveValue(&store.spmute, (uint8_t)0);
   store.play_mode = store.play_mode & 0b11;
   if(store.play_mode>1) store.play_mode=PM_WEB;
   _initHW();
@@ -114,7 +119,15 @@ void Config::_setupVersion(){
       // v5 added store.spmute (user speaker/amp mute). Must be initialised
       // explicitly: the field is new, so EEPROM holds junk there, and a junk
       // value of non-zero would leave the amp permanently muted at boot.
-      saveValue(&store.spmute, false);
+      saveValue(&store.spmute, (uint8_t)0);
+      break;
+    case 5:
+      // v6 added store.es8388 (runtime-adjustable ES8388 settings). Seed from
+      // the myoptions.h defaults; without this the new EEPROM bytes are junk and
+      // a stray non-zero mute/volume byte would leave the codec misconfigured.
+#ifdef ES8388_ENABLE
+      setEs8388Defaults();
+#endif
       break;
     default:
       break;
@@ -377,7 +390,10 @@ void Config::setDefaults() {
   store.skipPlaylistUpDown = false;
   store.screensaverPlayingEnabled = false;
   store.screensaverPlayingTimeout = 5;
-  store.spmute = false;
+  store.spmute = 0;
+#ifdef ES8388_ENABLE
+  setEs8388Defaults();
+#endif
   eepromWrite(EEPROM_START, store);
 }
 
@@ -741,9 +757,45 @@ void Config::setBrightness(bool dosave){
 }
 
 void Config::setSpeakerMute(bool muted){
-  store.spmute = muted;
-  saveValue(&store.spmute, store.spmute);
+  // Pass the new value to saveValue rather than assigning the field first:
+  // saveValue returns early when the field already holds the value, so
+  // pre-assigning here would skip the EEPROM write and the mute would be lost
+  // on reboot. force=true also rewrites the byte so a stale 0xFF clears.
+  saveValue(&store.spmute, (uint8_t)(muted ? 1 : 0), true, true);
 }
+
+#ifdef ES8388_ENABLE
+void Config::setEs8388Defaults(){
+  store.es8388.es_master_vol  = ES8388_MAIN_VOLUME;
+  store.es8388.es_vol1        = ES8388_OUT1_VOLUME;
+  store.es8388.es_vol2        = ES8388_OUT2_VOLUME;
+  store.es8388.es_bal1        = 0;
+  store.es8388.es_bal2        = 0;
+  store.es8388.es_stereo_eff  = ES8388_STEREO_EFF;
+  store.es8388.es_mono        = ES8388_MONO;
+  store.es8388.es_vpp         = ES8388_VPP_SCALE;
+  store.es8388.es_soft_ramp   = ES8388_SOFT_RAMP;
+  store.es8388.es_ramp_rate   = ES8388_RAMP_RATE;
+  store.es8388.es_deemph      = ES8388_DEEMPHASIS;
+  store.es8388.es_clickfree   = ES8388_CLICK_FREE;
+  store.es8388.es_invl        = ES8388_INVERT_L;
+  store.es8388.es_invr        = ES8388_INVERT_R;
+  store.es8388.es_vroi        = ES8388_VROI;
+  store.es8388.es_linein      = ES8388_LINEIN_MIX;
+  store.es8388.es_linein_gain = ES8388_LINEIN_GAIN;
+  store.es8388.es_adc         = 0;
+  store.es8388.es_mic_pga     = ES8388_MIC_PGA;
+  store.es8388.es_mic_sel     = ES8388_MIC_INPUT;
+  store.es8388.es_mic_bias    = ES8388_MIC_BIAS;
+  store.es8388.es_standby     = ES8388_STANDBY_ON_STOP;
+  store.es8388.es_mute1       = ES8388_OUT1_MUTE;
+  store.es8388.es_mute2       = ES8388_OUT2_MUTE;
+  store.es8388.es_mute_main   = ES8388_MAIN_MUTE;
+  // force=true is required: the fields were just assigned above, so without it
+  // saveValue's "already equal, nothing to do" guard would skip the EEPROM write.
+  saveValue(&store.es8388, store.es8388, true, true);
+}
+#endif
 
 void Config::setDspOn(bool dspon, bool saveval){
   if(saveval){

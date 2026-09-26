@@ -8,9 +8,9 @@
   #include "../audioVS1053/audioVS1053Ex.h"
 #endif
 
-//#ifdef ES8388_ENABLE
-//  #include "../audioES8388/ES8388.h"
-//#endif  
+#ifdef ES8388_ENABLE
+  #include "../audioES8388/ES8388.h"
+#endif
 
 #ifndef MQTT_BURL_SIZE
   #define MQTT_BURL_SIZE  512
@@ -75,9 +75,20 @@ class Player: public Audio {
     /* User-controlled speaker/amp mute, OR'd into setOutputPins() */
     void setSpeakerMute(bool muted);
     bool speakerMute() const { return _spmute; }
+    #ifdef ES8388_ENABLE
+    /* Push the persisted ES8388 settings to the codec. */
+    void applyEs8388Settings();
+    void setEs8388Out(ES8388::ES8388_OUT out, uint8_t vol, int8_t balance);
+    /* Park/wake the codec with playback; also flips the persisted flag. */
+    void setEs8388Standby(bool on);
+    #endif
     void setResumeFilePos(uint32_t pos) { _resumeFilePos = pos; }
   private:
     bool _spmute = false;
+#ifdef ES8388_ENABLE
+    bool es_standby_wanted = false; // mirror of config.store.es8388.es_standby
+    bool es_sleeping = false;       // true while the codec is in standby
+#endif
 };
 
 extern Player player;

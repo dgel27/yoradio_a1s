@@ -48,7 +48,7 @@
 #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
   #define ESP_ARDUINO_3 1
 #endif
-#define CONFIG_VERSION  5
+#define CONFIG_VERSION  6
 
 enum playMode_e      : uint8_t  { PM_WEB=0, PM_SDCARD=1 };
 enum BitrateFormat { BF_UNCNOWN, BF_MP3, BF_AAC, BF_FLAC, BF_OGG, BF_WAV };
@@ -84,6 +84,53 @@ struct theme_t {
   uint16_t plcurrentbg;
   uint16_t plcurrentfill;
   uint16_t playlist[5];
+};
+
+#ifdef ES8388_ENABLE
+// Runtime-adjustable ES8388 settings. These are seeded from myoptions.h on
+// factory reset / version upgrade, and afterwards the web UI and telnet
+// overwrite them and persist them, so a reboot keeps the user's choice.
+struct es8388_t
+{
+    // --- volumes ---
+    uint8_t es_master_vol;   // 0..192 digital volume, 192 = 0dB
+    uint8_t es_vol1;         // 0..33 LOUT1/ROUT1 analog volume, 30 = 0dB
+    uint8_t es_vol2;         // 0..33 LOUT2/ROUT2 analog volume, 30 = 0dB
+    int8_t  es_bal1;         // -6..+6 LOUT1/ROUT1 L/R balance
+    int8_t  es_bal2;         // -6..+6 LOUT2/ROUT2 L/R balance
+    // --- DAC Control 7 (0x1d) ---
+    uint8_t es_stereo_eff;   // 0..7 stereo enhancement
+    uint8_t es_mono;         // 0 = stereo, 1 = (L+R)/2
+    uint8_t es_vpp;          // 0..3 DAC Vpp scale (3.5/4.0/3.0/2.5 V)
+    // --- DAC Control 3 (0x19) ---
+    uint8_t es_soft_ramp;    // 1 = soft volume ramp (removes clicks)
+    uint8_t es_ramp_rate;    // 0..3 ramp rate selector
+    // --- DAC Control 6 (0x1c) ---
+    uint8_t es_deemph;       // 0 off, 1 = 32k, 2 = 44.1k, 3 = 48k
+    uint8_t es_clickfree;    // 1 = click-free power up/down
+    uint8_t es_invl;         // invert left channel phase
+    uint8_t es_invr;         // invert right channel phase
+    // --- DAC Control 23 (0x2d) ---
+    uint8_t es_vroi;         // 0 = 1.5k output impedance, 1 = 40k
+    // --- output mixers (0x27/0x2a) ---
+    uint8_t es_linein;       // 1 = mix LIN1/LIN2 into the outputs
+    int8_t  es_linein_gain;  // -15..+6 dB, 3dB steps
+    // --- ADC (0x03/0x09/0x0a) ---
+    uint8_t es_adc;          // 1 = power up the ADC
+    uint8_t es_mic_pga;      // 0..8 = 0..+24dB in 3dB steps
+    uint8_t es_mic_sel;      // 0 = LIN1&RIN1, 1 = LIN2&RIN2, 2 = differential
+    uint8_t es_mic_bias;     // 1 = MBIAS output on (electret mics)
+    // --- power management ---
+    uint8_t es_standby;      // 1 = codec standby when playback stops
+    // --- output mute ---
+    uint8_t es_mute1;        // 1 = mute LOUT1/ROUT1
+    uint8_t es_mute2;        // 1 = mute LOUT2/ROUT2
+    uint8_t es_mute_main;    // 1 = digital mute
+
+    // so config.saveValue(&store.es8388, ...) can skip redundant writes
+    bool operator==(const es8388_t &o) const {
+        return memcmp(this, &o, sizeof(es8388_t)) == 0;
+    }
 };
 
 struct config_t
@@ -145,7 +192,13 @@ struct config_t
   bool      screensaverPlayingBlank;
   char      mdnsname[24];
   bool      skipPlaylistUpDown;
-  bool      spmute; // user-controlled speaker/amp mute
+  // user-controlled speaker/amp mute. uint8_t, not bool: a bool read straight
+  // from EEPROM cannot be told apart from a 0xFF junk byte, and junk here would
+  // silently leave the amp muted. Non-zero means muted.
+  uint8_t   spmute;
+#ifdef ES8388_ENABLE
+  es8388_t  es8388;  // runtime ES8388 settings, seeded from myoptions.h
+#endif
 };
 
 #if IR_PIN!=255
@@ -156,19 +209,6 @@ struct ircodes_t
 };
 #endif
 
-#ifdef ES8388_ENABLE
-struct es8388_t
-{
-    uint8_t es_master_vol;
-    uint8_t es_sereo_eff;
-    uint8_t es_vol1;
-    uint8_t es_vol2;
-    uint8_t es_bal1;
-    uint8_t es_bal2;
-    uint8_t es_mute1;
-    uint8_t es_mute2;
-    uint8_t es_mute_head_phone; 
-};
 #endif
 
 struct station_t
@@ -254,6 +294,10 @@ class Config {
     void setBrightness(bool dosave=false);
     void setDspOn(bool dspon, bool saveval = true);
     void setSpeakerMute(bool muted);
+#ifdef ES8388_ENABLE
+    /* Seed store.es8388 from the myoptions.h compile-time defaults. */
+    void setEs8388Defaults();
+#endif
     void sleepForAfter(uint16_t sleepfor, uint16_t sleepafter=0);
     void bootInfo();
     void doSleepW();
