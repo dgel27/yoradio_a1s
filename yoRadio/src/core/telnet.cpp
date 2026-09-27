@@ -206,7 +206,7 @@ void Telnet::printHelp(uint8_t clientId) {
   printf(clientId, "  esvol2 <n>              ES8388 OUT2 (speaker) volume 0-33\n");
   printf(clientId, "  esch1bal <n>            ES8388 OUT1 L/R balance -6..+6\n");
   printf(clientId, "  esch2bal <n>            ES8388 OUT2 L/R balance -6..+6\n");
-  printf(clientId, "  esstereo <n>            ES8388 stereo enhancement 0-7\n");
+  printf(clientId, "  esstereo <n>            ES8388 stereo widening 0-7 (not a tone EQ)\n");
   printf(clientId, "  esvpp <n>               ES8388 DAC Vpp scale 0-3\n");
   printf(clientId, "  esdeemph <n>            ES8388 de-emphasis 0-3\n");
   printf(clientId, "  esramprate <n>          ES8388 soft-ramp rate 0-3\n");
@@ -588,7 +588,7 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   }
   if (sscanf(str, "esstereo %d", &svol) == 1) {
     if (svol < 0) svol = 0; if (svol > 7) svol = 7;
-    printf(clientId, "#ES8388.SE# set stereo enhancement: %d (0-7) \n> ", svol);
+    printf(clientId, "#ES8388.SE# set stereo widening: %d (0-7) \n> ", svol);
     config.saveValue(&E.es_stereo_eff, (uint8_t)svol);
     es.stereo_eff((uint8_t)svol);
       return;

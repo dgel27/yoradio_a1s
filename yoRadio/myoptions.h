@@ -40,12 +40,14 @@
 /*****************************************************************************/
 
 /* Digital volume, attenuates BOTH analog outputs. Register 26/27.
-   0..192 where 192 = 0dB (loudest) and 0 = -96dB, 0.5dB per step.
-   NOTE: the driver used to cap this at 96 (-48dB), so the same "75" produced
-   register 24 (-12dB). With the corrected full range 75 would mean -58.5dB
-   (inaudible), so the value is re-based: 168 -> register 24 -> -12dB, which is
-   the level this fork ran at before. */
-#define ES8388_MAIN_VOLUME     168     // -12dB digital attenuation
+   0..192 where 192 = 0dB (unity) and 0 = -96dB, 0.5dB per step.
+   192 (0dB) is safe here: the software chain can never exceed the decoder's
+   own output. Audio halves each sample (Audio.cpp, "half Vin so we can boost up
+   to 6dB in filters"), the biquad gains are clamped to +6dB max, and Gain() at
+   m_vol 254 is ~unity, so the worst case nets to 0dB. This is a fixed
+   headroom/trim setting; the user's volume slider is the software path
+   (index.html "volume" -> config.store.volume -> Audio::setVolume). */
+#define ES8388_MAIN_VOLUME     192     // 0dB, unity
 /* Analog output volume. Registers 46/47 (LOUT1/ROUT1) and 48/49 (LOUT2/ROUT2).
    0..33 where 30 = 0dB and 33 = +4.5dB, 1.5dB per step, 0 = -45dB.
    On the ESP32-A1S: OUT1 = headphone amp (HPOUTL/R), OUT2 = on-board

@@ -609,7 +609,7 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
 // (sliders) and the id= of the hpmutesp checkbox. Each handler persists to
 // config.store.es8388 so the value survives a reboot.
 //         - esmastervol  digital volume, both outputs (0-192)
-//         - esstereo    stereo enhancement 0-7
+//         - esstereo    stereo widening strength 0-7 (an effect, not a tone EQ)
 //         - esvol1      LOUT1/ROUT1 (headphone amp) analog volume 0-33
 //         - esch1bal    LOUT1/ROUT1 L/R balance -6..+6
 //         - esvol2      LOUT2/ROUT2 (on-board speaker amp) analog volume 0-33
