@@ -154,6 +154,21 @@ void Config::_setupVersion(){
       // junk host string would make it dial a random address on every boot.
       setMqttDefaults();
       break;
+    case 7:
+      // v8 appended mqtt.user / mqtt.pass. The v7 struct ended at mqtt.topic, so
+      // the bytes for these two are whatever the EEPROM held (0xFF on a fresh
+      // region) and must be seeded or the firmware would authenticate with a
+      // garbage username. Deliberately NOT a full setMqttDefaults(): the user may
+      // already have edited host/port/topic, and that must survive the upgrade.
+#ifdef MQTT_ROOT_TOPIC
+      strlcpy(store.mqtt.user, MQTT_USER, sizeof(store.mqtt.user));
+      strlcpy(store.mqtt.pass, MQTT_PASS, sizeof(store.mqtt.pass));
+#else
+      store.mqtt.user[0] = '\0';
+      store.mqtt.pass[0] = '\0';
+#endif
+      saveValue(&store.mqtt, store.mqtt, true, true);
+      break;
     default:
       break;
   }
@@ -829,12 +844,16 @@ void Config::setMqttDefaults(){
   strlcpy(store.mqtt.host, MQTT_HOST, sizeof(store.mqtt.host));
   store.mqtt.port = MQTT_PORT;
   strlcpy(store.mqtt.topic, MQTT_ROOT_TOPIC, sizeof(store.mqtt.topic));
+  strlcpy(store.mqtt.user, MQTT_USER, sizeof(store.mqtt.user));
+  strlcpy(store.mqtt.pass, MQTT_PASS, sizeof(store.mqtt.pass));
 #else
   // No mqttoptions.h in the tree: leave the broker unset so MQTT stays off
   // rather than trying to reach a broker that does not exist.
   store.mqtt.host[0] = '\0';
   store.mqtt.port = 1883;
   strlcpy(store.mqtt.topic, "yoradio/", sizeof(store.mqtt.topic));
+  store.mqtt.user[0] = '\0';
+  store.mqtt.pass[0] = '\0';
 #endif
   // force=true for the same reason as setEs8388Defaults(): the fields were
   // assigned just above, so the "already equal" guard would skip the write.

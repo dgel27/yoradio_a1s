@@ -234,6 +234,8 @@ void Telnet::printHelp(uint8_t clientId) {
   printf(clientId, "  mqtthost <host|->       MQTT broker host; \"-\" clears it (disables MQTT)\n");
   printf(clientId, "  mqttport <n>            MQTT broker port (default 1883)\n");
   printf(clientId, "  mqtttopic <prefix>      MQTT root topic, e.g. yoradio/lab/\n");
+  printf(clientId, "  mqttuser <user|->       MQTT username; \"-\" connects anonymously\n");
+  printf(clientId, "  mqttpass <pass|->       MQTT password; \"-\" clears it\n");
   printf(clientId, "  mqttreset               MQTT settings back to mqttoptions.h defaults\n");
   #endif
   printf(clientId, "Most commands also accept the cli. prefix and (args) form.\n> ");
@@ -699,8 +701,15 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
 #endif //ES8388_ENABLE
 
 #ifdef MQTT_ROOT_TOPIC
-  if (strncmp(str, "mqtthost ", 9) == 0) {
-      const char *h = str + 9;
+  // Match a "<command> " prefix and skip past it. The length comes from the
+  // literal via sizeof-1 so it is always exactly the literal's length: passing a
+  // hand-counted length instead compares the literal's NUL terminator against the
+  // first character of the argument and the match silently fails.
+  #define TELNET_CMD(lit) (strncmp(str, lit, sizeof(lit) - 1) == 0)
+  #define TELNET_ARG(lit) (str + sizeof(lit) - 1)
+
+  if (TELNET_CMD("mqtthost ")) {
+      const char *h = TELNET_ARG("mqtthost ");
       if (*h == '-' || *h == '\0') {
           // "-" clears the host, which disables MQTT (config.mqttEnabled() is
           // simply "host is non-empty").
@@ -722,10 +731,38 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
       printf(clientId, "#MQTT# broker port: %d\n> ", svol);
       return;
   }
-  if (strncmp(str, "mqtttopic ", 10) == 0) {
-      config.saveValue(config.store.mqtt.topic, str + 10, MQTT_TOPIC_LENGTH);
+  if (TELNET_CMD("mqtttopic ")) {
+      config.saveValue(config.store.mqtt.topic, TELNET_ARG("mqtttopic "), MQTT_TOPIC_LENGTH);
       mqttReconfigure();
       printf(clientId, "#MQTT# root topic: %s\n> ", config.store.mqtt.topic);
+      return;
+  }
+  if (TELNET_CMD("mqttuser ")) {
+      const char *u = TELNET_ARG("mqttuser ");
+      if (*u == '-' || *u == '\0') {
+          // "-" clears it, which reconnects anonymously.
+          config.saveValue(config.store.mqtt.user, "", MQTT_USER_LENGTH);
+          mqttReconfigure();
+          printf(clientId, "#MQTT# user cleared - connecting anonymously\n> ");
+      } else {
+          config.saveValue(config.store.mqtt.user, u, MQTT_USER_LENGTH);
+          mqttReconfigure();
+          printf(clientId, "#MQTT# user: %s\n> ", config.store.mqtt.user);
+      }
+      return;
+  }
+  if (TELNET_CMD("mqttpass ")) {
+      const char *pw = TELNET_ARG("mqttpass ");
+      if (*pw == '-' || *pw == '\0') {
+          config.saveValue(config.store.mqtt.pass, "", MQTT_PASS_LENGTH);
+          mqttReconfigure();
+          printf(clientId, "#MQTT# password cleared\n> ");
+      } else {
+          config.saveValue(config.store.mqtt.pass, pw, MQTT_PASS_LENGTH);
+          mqttReconfigure();
+          // Deliberately not echoed back.
+          printf(clientId, "#MQTT# password set (%d chars)\n> ", (int)strlen(config.store.mqtt.pass));
+      }
       return;
   }
   if (strcmp(str, "mqttreset") == 0) {
@@ -736,12 +773,16 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
       return;
   }
   if (strcmp(str, "mqttstatus") == 0) {
-      printf(clientId, "#MQTT# %s host=%s port=%d topic=%s\n> ",
+      printf(clientId, "#MQTT# %s host=%s port=%d topic=%s user=%s pass=%s\n> ",
              config.mqttEnabled() ? "enabled" : "disabled (no host)",
-             config.store.mqtt.host, config.store.mqtt.port, config.store.mqtt.topic);
+             config.store.mqtt.host, config.store.mqtt.port, config.store.mqtt.topic,
+             config.store.mqtt.user[0] ? config.store.mqtt.user : "(none)",
+             config.store.mqtt.pass[0] ? "(set)" : "(none)");
       return;
   }
 #endif //MQTT_ROOT_TOPIC
+  #undef TELNET_CMD
+  #undef TELNET_ARG
   
   telnet.printf(clientId, "##CMD_ERROR#\tunknown command <%s>\n> ", str);
 }

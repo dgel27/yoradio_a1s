@@ -62,7 +62,12 @@ void mqttReconfigure() {
     return;
   }
 
-  if (strlen(MQTT_USER) > 0) mqttClient.setCredentials(MQTT_USER, MQTT_PASS);
+  // An empty username means connect anonymously. setCredentials is only called
+  // when there is something to send: passing an empty user would otherwise
+  // configure an empty username rather than no credentials at all.
+  if (strlen(config.store.mqtt.user) > 0) {
+    mqttClient.setCredentials(config.store.mqtt.user, config.store.mqtt.pass);
+  }
   mqttClient.setServer(config.store.mqtt.host, config.store.mqtt.port);
   if (mqttMakeTopic("connection")) {
     mqttClient.setWill(topic, 0, MQTT_RETAIN_ONLINE, "offline");

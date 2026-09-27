@@ -46,6 +46,8 @@
    short enough to stay inside mqtt.cpp's 140-byte scratch buffer. */
 #define MQTT_HOST_LENGTH 32
 #define MQTT_TOPIC_LENGTH 48
+#define MQTT_USER_LENGTH 32
+#define MQTT_PASS_LENGTH 32
 
 #if SDC_CS!=255
   #define USE_SD
@@ -54,7 +56,7 @@
 #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
   #define ESP_ARDUINO_3 1
 #endif
-#define CONFIG_VERSION  7
+#define CONFIG_VERSION  8
 
 enum playMode_e      : uint8_t  { PM_WEB=0, PM_SDCARD=1 };
 enum BitrateFormat { BF_UNCNOWN, BF_MP3, BF_AAC, BF_FLAC, BF_OGG, BF_WAV };
@@ -95,12 +97,14 @@ struct theme_t {
 // MQTT broker settings, editable from the web UI / telnet. Seeded from
 // mqttoptions.h on reset, then owned by the user. An empty host disables MQTT
 // entirely (no connect attempt, no reconnect timer), so clearing the field is
-// how you turn it off without reflashing.
+// how you turn it off without reflashing. An empty user means "no credentials".
 struct mqtt_t
 {
     char     host[MQTT_HOST_LENGTH];   // broker hostname or IP; "" = disabled
     uint16_t port;                     // 1..65535
     char     topic[MQTT_TOPIC_LENGTH]; // root topic, e.g. "yoradio/lab/"
+    char     user[MQTT_USER_LENGTH];   // "" = connect anonymously
+    char     pass[MQTT_PASS_LENGTH];
 
     // so config.saveValue(&store.mqtt, ...) can skip redundant writes
     bool operator==(const mqtt_t &o) const {

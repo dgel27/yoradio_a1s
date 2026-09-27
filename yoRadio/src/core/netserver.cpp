@@ -353,9 +353,10 @@ void NetServer::processQueue(){
         }
 #endif
                                   break;
-      case GETMQTT:      snprintf (wsbuf, 200, "{\"mqhost\":\"%s\",\"mqport\":%d,\"mqtopic\":\"%s\",\"mqen\":%d}",
+      case GETMQTT:      snprintf (wsbuf, 250, "{\"mqhost\":\"%s\",\"mqport\":%d,\"mqtopic\":\"%s\",\"mquser\":\"%s\",\"mqpass\":\"%s\",\"mqen\":%d}",
                                   config.store.mqtt.host, (int)config.store.mqtt.port,
-                                  config.store.mqtt.topic, config.mqttEnabled() ? 1 : 0);
+                                  config.store.mqtt.topic, config.store.mqtt.user,
+                                  config.store.mqtt.pass, config.mqttEnabled() ? 1 : 0);
                                   break;
       case STATION:       requestOnChange(STATIONNAME, clientId); requestOnChange(ITEM, clientId); break;
       case STATIONNAME:   sprintf (wsbuf, "{\"nameset\": \"%s\"}", config.station.name); break;
@@ -681,7 +682,8 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
       // once all three arrive, so a user typing the host then the port does not
       // cause a reconnect in between. An empty host disables MQTT.
       if (strcmp(cmd, "mqtthost") == 0 || strcmp(cmd, "mqttport") == 0 ||
-          strcmp(cmd, "mqtttopic") == 0) {
+          strcmp(cmd, "mqtttopic") == 0 || strcmp(cmd, "mqttuser") == 0 ||
+          strcmp(cmd, "mqttpass") == 0) {
         if (strcmp(cmd, "mqtthost") == 0) {
           config.saveValue(config.store.mqtt.host, val, MQTT_HOST_LENGTH);
         } else if (strcmp(cmd, "mqttport") == 0) {
@@ -689,6 +691,10 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
           if (p < 1) p = 1;
           if (p > 65535) p = 65535;
           config.saveValue(&config.store.mqtt.port, (uint16_t)p);
+        } else if (strcmp(cmd, "mqttuser") == 0) {
+          config.saveValue(config.store.mqtt.user, val, MQTT_USER_LENGTH);
+        } else if (strcmp(cmd, "mqttpass") == 0) {
+          config.saveValue(config.store.mqtt.pass, val, MQTT_PASS_LENGTH);
         } else {
           config.saveValue(config.store.mqtt.topic, val, MQTT_TOPIC_LENGTH);
         }
