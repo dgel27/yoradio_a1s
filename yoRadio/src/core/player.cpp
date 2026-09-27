@@ -284,6 +284,35 @@ void Player::loop() {
 #endif
 }
 
+void Player::prepareForRestart() {
+  // A restart takes the CPU down mid-playback. Two things make that audible:
+  //   1. MUTE_PIN is an output, and on reset every GPIO reverts to input/high-Z.
+  //      If the amp enable pin has no external pull, the amplifier floats and
+  //      amplifies whatever the codec's output stage is doing - which is why the
+  //      burst is loud regardless of the volume setting. Driving the mute level
+  //      first, while we still can, closes that window as far as software can.
+  //   2. The DAC is mid-stream; power it down cleanly so the output ramps to
+  //      zero rather than collapsing.
+  // What this CANNOT cover is the gap between esp_restart() and setup() running,
+  // which includes the whole bootloader. Only an external pull-down resistor on
+  // MUTE_PIN covers that; see the notes in myoptions.h.
+  if(MUTE_PIN!=255) {
+    pinMode(MUTE_PIN, OUTPUT);
+    digitalWrite(MUTE_PIN, MUTE_LOCK ? !MUTE_VAL : MUTE_VAL);
+  }
+#ifdef ES8388_ENABLE
+  // Power the DAC down regardless of the standby setting: a restart is not a
+  // normal stop, so the user's es_standby preference should not keep the output
+  // stage alive through it.
+  es.mute(ES8388::ES_MAIN, true);
+  es.mute(ES8388::ES_OUT1, true);
+  es.mute(ES8388::ES_OUT2, true);
+  es.standby();
+#endif
+  // Let the amp discharge and the output settle before the pins are released.
+  delay(200);
+}
+
 void Player::setOutputPins(bool isPlaying) {
   if(REAL_LEDBUILTIN!=255) digitalWrite(REAL_LEDBUILTIN, LED_INVERT?!isPlaying:isPlaying);
   // MUTE_VAL is the level that mutes; the user speaker-mute flag forces it.

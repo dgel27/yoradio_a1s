@@ -187,6 +187,7 @@ void Config::changeMode(int newmode){
   if(network.status==SOFT_AP || display.mode()==LOST){
     saveValue(&store.play_mode, static_cast<uint8_t>(PM_SDCARD));
     delay(50);
+    Player::prepareForRestart();
     ESP.restart();
   }
   if(!sdman.ready && newmode!=PM_WEB) {
@@ -213,7 +214,7 @@ void Config::changeMode(int newmode){
     delay(50);
   }
   if(getMode()==PM_WEB) {
-    if(network.status==SDREADY) ESP.restart();
+    if(network.status==SDREADY) { Player::prepareForRestart(); ESP.restart(); }
     sdman.stop();
   }
   if(!_bootDone) return;
@@ -370,6 +371,7 @@ template <class T> int Config::eepromRead(int ee, T& value) {
 void Config::reset(){
   setDefaults();
   delay(500);
+  Player::prepareForRestart();
   ESP.restart();
 }
 
@@ -741,6 +743,7 @@ bool Config::saveWifiFromNextion(const char* post){
   } else {
     file.print(post);
     file.close();
+    Player::prepareForRestart();
     ESP.restart();
     return true;
   }
@@ -750,6 +753,7 @@ bool Config::saveWifi() {
   if (!SPIFFS.exists(TMP_PATH)) return false;
   SPIFFS.remove(SSIDS_PATH);
   SPIFFS.rename(TMP_PATH, SSIDS_PATH);
+  Player::prepareForRestart();
   ESP.restart();
   return true;
 }

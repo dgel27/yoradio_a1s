@@ -18,6 +18,17 @@ extern __attribute__((weak)) void yoradio_on_setup();
 
 void setup() {
   Serial.begin(115200);
+  // Mute the amplifier before anything slow happens. Player::setOutputPins() is
+  // not reached until player.init(), which is after config.init() and
+  // display.init() - hundreds of milliseconds during which MUTE_PIN is still an
+  // input and the amp is floating. Doing it first here keeps the speaker shut for
+  // the whole of start-up rather than just after the player is initialised.
+  // (The gap between esp_restart() and this line still needs a pull-down
+  // resistor on MUTE_PIN; see the note in Player::prepareForRestart().)
+  if(MUTE_PIN!=255) {
+    pinMode(MUTE_PIN, OUTPUT);
+    digitalWrite(MUTE_PIN, MUTE_LOCK ? !MUTE_VAL : MUTE_VAL);
+  }
 //  pinMode(GPIO_PA_EN, OUTPUT);
 //  digitalWrite(GPIO_PA_EN, HIGH);
   if(REAL_LEDBUILTIN!=255) pinMode(REAL_LEDBUILTIN, OUTPUT);

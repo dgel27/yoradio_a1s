@@ -150,6 +150,7 @@ void onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties 
     return;
   }
   if (strcmp(buf, "boot") == 0 || strcmp(buf, "reboot") == 0) {
+    Player::prepareForRestart();
     ESP.restart();
     return;
   }

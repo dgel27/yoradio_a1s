@@ -79,7 +79,8 @@ bool NetServer::begin(bool quiet) {
         return;
       }
       request->redirect("/"); 
-      ESP.restart(); 
+      Player::prepareForRestart();
+      ESP.restart();
     }, handleUploadWeb);
   }else{
     webserver.on("/", HTTP_ANY, handleHTTPArgs);
@@ -398,6 +399,7 @@ void NetServer::loop() {
   if (shouldReboot) {
     Serial.println("Rebooting...");
     delay(100);
+    Player::prepareForRestart();
     ESP.restart();
   }
   websocket.cleanupClients();
@@ -477,6 +479,7 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
           snprintf(buf, MDNS_LENGTH*2, "{\"redirect\": \"http://%s/\"}", WiFi.localIP().toString().c_str());
         websocket.text(clientId, buf);
         delay(500);
+        Player::prepareForRestart();
         ESP.restart();
         return;
       }
@@ -1177,6 +1180,7 @@ void handleHTTPArgs(AsyncWebServerRequest * request) {
       if(config.spiffsCleanup()){
         config.saveValue(&config.store.play_mode, static_cast<uint8_t>(PM_WEB));
         request->redirect("/");
+        Player::prepareForRestart();
         ESP.restart();
       }else{
         request->send(200);

@@ -460,6 +460,7 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
     return;
   }
   if (strcmp(str, "sys.boot") == 0 || strcmp(str, "boot") == 0 || strcmp(str, "reboot") == 0) {
+    Player::prepareForRestart();
     ESP.restart();
     return;
   }

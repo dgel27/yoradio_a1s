@@ -81,6 +81,10 @@ class Player: public Audio {
     void setEs8388Out(ES8388::ES8388_OUT out, uint8_t vol, int8_t balance);
     /* Park/wake the codec with playback; also flips the persisted flag. */
     void setEs8388Standby(bool on);
+    /* Mute the amp and silence the codec ahead of a restart. Call this
+       immediately before ESP.restart() so the speaker is shut down before the
+       CPU stops, instead of floating until the next boot drives the pin. */
+    static void prepareForRestart();
     #endif
     void setResumeFilePos(uint32_t pos) { _resumeFilePos = pos; }
   private:

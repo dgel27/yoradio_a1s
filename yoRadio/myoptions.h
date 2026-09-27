@@ -27,7 +27,18 @@
 //#define GPIO_PA_LEVEL    HIGH /* Amplifier enable level */
 //#define SD_DETECT        34 // ?
 //#define HP_DETECT        39 // ?
-/* The MUTE_PIN is inversed GPIO_PA_EN and implemented in YORADIO */
+/* The MUTE_PIN is inversed GPIO_PA_EN and implemented in YORADIO.
+ *
+ * HARDWARE NOTE: fit a pull-down resistor (10k is fine) between MUTE_PIN and
+ * GND. A restart takes every GPIO to input/high-Z, so without an external pull
+ * the amplifier enable pin floats for the whole time the ESP32 is resetting and
+ * running its bootloader - the amplifier then amplifies whatever the codec
+ * output stage is doing, which is loud and unrelated to the volume setting.
+ *
+ * The firmware cannot cover that gap: it drives the mute level as the first
+ * thing in setup() (closing the window from there on) and calls
+ * Player::prepareForRestart() before every ESP.restart(), but nothing executes
+ * between esp_restart() and setup(). Only the resistor covers that. */
 #define MUTE_PIN        21   /*  MUTE Pin */
 #define MUTE_VAL        LOW  /*  Write this to MUTE_PIN when player is stopped */
 

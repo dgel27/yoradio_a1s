@@ -263,6 +263,7 @@ void MyNetwork::requestTimeSync(bool withTelnetOutput, uint8_t clientId) {
 }
 
 void rebootTime() {
+  Player::prepareForRestart();
   ESP.restart();
 }
 
