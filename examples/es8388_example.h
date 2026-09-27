@@ -1,3 +1,30 @@
+/* ===========================================================================
+ * DEPRECATED - do not copy this file.
+ *
+ * Use ../examples/myoptions-a1s.h instead. It is the verified ESP32-A1S /
+ * ES8388 configuration for this fork, and this file is wrong in three ways
+ * that cost real time to work out:
+ *
+ *   1. The I2C pin names are dead. It says ES_IIC_CLK / ES_IIC_DATA, but this
+ *      firmware only ever reads ES8388_SCL / ES8388_SDA (src/core/player.cpp).
+ *      Copying these names leaves the codec on whatever the defaults are.
+ *
+ *   2. The volume values are on the OLD scale. It uses 75, which was correct
+ *      when the driver mapped 0-100 onto the register. The driver now maps
+ *      0-192 (192 = 0dB, 0.5dB per step), so 75 lands on roughly -58dB and the
+ *      board is inaudible. The equivalent on the current scale is 192 for the
+ *      main volume and 30 for each analog output.
+ *
+ *   3. Its OUT1/OUT2 comments contradict each other ("works for amp" vs
+ *      "HeadPhones?"). On this board OUT1 is the headphone amp (HPOUTL/R) and
+ *      OUT2 is the on-board speaker amp (SPOLP/N).
+ *
+ * It also defines ES8388_ENABLE with no value, which does not compile in this
+ * fork - see the note in myoptions-a1s.h.
+ *
+ * Kept only so the upstream reference is still visible. Nothing references it.
+ * =========================================================================== */
+
 #ifndef myoptions_h
 #define myoptions_h
 
