@@ -5,15 +5,16 @@
 #include <SPI.h>
 #include <SPIFFS.h>
 #include <EEPROM.h>
+#include <cstddef>      // offsetof, for CONFIG_LAYOUT below
 //#include "SD.h"
 #include "options.h"
 #include "rtcsupport.h"
 #include "../pluginsManager/pluginsManager.h"
 
-#define EEPROM_SIZE       768
-#define EEPROM_START      500
+// EEPROM_START_IR and EEPROM_SIZE are defined further down, after config_t:
+// EEPROM_SIZE is derived from sizeof(config_t) so the emulated EEPROM grows and
+// shrinks with the struct instead of needing a manual bump.
 #define EEPROM_START_IR   0
-#define EEPROM_START_2    10
 #ifndef BUFLEN
   #define BUFLEN            170
 #endif
@@ -137,6 +138,11 @@ struct config_t
 {
   uint16_t  config_set; //must be 4262
   uint16_t  version;
+  // Fingerprint of the struct layout this firmware expects (see
+  // CONFIG_LAYOUT below). Stored so a reflash that changes the layout is
+  // detected and the settings are re-seeded, instead of silently reading
+  // the old bytes as if they were still meaningful.
+  uint16_t  layout;
   uint8_t   volume;
   int8_t    balance;
   int8_t    trebble;
@@ -200,6 +206,37 @@ struct config_t
   es8388_t  es8388;  // runtime ES8388 settings, seeded from myoptions.h
 #endif
 };
+
+/* Where config_t lives in the emulated EEPROM.
+   ircodes_t sits at EEPROM_START_IR and is 484 bytes, so when IR is enabled the
+   config has to start past it. When IR is disabled that block is not compiled
+   at all, so there is no reason to reserve room for it. */
+#if IR_PIN!=255
+  #define EEPROM_START 500
+#else
+  #define EEPROM_START 0
+#endif
+
+/* The ESP32 has no real EEPROM: this is a RAM buffer that the Arduino core
+   flushes to NVS as a single blob. Sizing it from the struct means the region
+   tracks config_t automatically, so adding a setting can no longer overrun a
+   hardcoded limit. The slack leaves room to grow the struct without changing
+   this expression. */
+#define EEPROM_SIZE       (EEPROM_START + (int)sizeof(config_t) + 32)
+
+/* Layout fingerprint, stored in config_t::layout.
+   Built from the offsets of a few stable fields rather than sizeof(), so that
+   APPENDING to the struct (the normal way to add a setting) does not trip it,
+   while a field reorder or a #ifdef-gated group appearing/disappearing in the
+   middle of the struct does. Those would otherwise silently reinterpret old
+   EEPROM bytes. EEPROM_START is folded in because changing it moves everything.
+   The canaries are unconditional fields that are not likely to be removed. */
+#define CONFIG_LAYOUT     ((uint16_t)( \
+     3u * offsetof(config_t, volume) \
+   + 5u * offsetof(config_t, sntp1) \
+   + 7u * offsetof(config_t, btnlongpress) \
+   + 11u * offsetof(config_t, mdnsname) \
+   + 13u * (unsigned)EEPROM_START ))
 
 #if IR_PIN!=255
 struct ircodes_t

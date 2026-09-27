@@ -12,10 +12,19 @@
 
 Config config;
 
-// The stored config is addressed per-field from EEPROM_START and must fit
-// before EEPROM_SIZE, otherwise saveValue() would spill into adjacent EEPROM.
-static_assert(sizeof(config_t) <= (EEPROM_SIZE - EEPROM_START),
-              "config_t grew past the EEPROM region (EEPROM_START..EEPROM_SIZE)");
+// EEPROM_SIZE is derived from sizeof(config_t), so config_t can no longer
+// overrun its own region. What CAN still fail is the blob not fitting the NVS
+// partition it is flushed to: "nvs" is 0x5000 = 20480 bytes in
+// partition_1.75Mapp_OTA_0.375Mfs.csv, and NVS needs headroom for its own page
+// bookkeeping, hence the 60% cap.
+static_assert(EEPROM_SIZE <= 12288,
+              "EEPROM blob will not fit the 0x5000 NVS partition");
+
+// config_t must not run into ircodes_t at EEPROM_START_IR when IR is enabled.
+#if IR_PIN!=255
+static_assert((size_t)EEPROM_START >= sizeof(ircodes_t),
+              "config_t would overlap ircodes_t at EEPROM_START_IR");
+#endif
 
 void u8fix(char *src){
   char last = src[strlen(src)-1]; 
@@ -67,6 +76,16 @@ void Config::init() {
   bootInfo();
   
   if (store.config_set != 4262) {
+    setDefaults();
+  } else if (store.layout != CONFIG_LAYOUT) {
+    // The struct was laid out differently when these bytes were written (a field
+    // moved, or a #ifdef-gated group like es8388 was added/removed), so the
+    // stored values no longer mean what they appear to. Re-seed rather than run
+    // on settings that are actually someone else's data reinterpreted.
+    // Appending to the end of config_t does not change the canary offsets, so
+    // adding a setting normally does NOT land here.
+    Serial.printf("##[BOOT]#\tEEPROM layout changed (stored 0x%04X, expected 0x%04X)"
+                  " - restoring default settings\n", store.layout, CONFIG_LAYOUT);
     setDefaults();
   }
   if(store.version>CONFIG_VERSION) store.version=1;
@@ -336,6 +355,7 @@ void Config::reset(){
 void Config::setDefaults() {
   store.config_set = 4262;
   store.version = CONFIG_VERSION;
+  store.layout = CONFIG_LAYOUT;   // stamp the layout these defaults are for
   store.volume = 12;
   store.balance = 0;
   store.trebble = 0;

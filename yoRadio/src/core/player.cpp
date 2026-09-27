@@ -73,7 +73,6 @@ void Player::init() {
   Serial.printf("OK\n");
 
   // Apply the persisted runtime settings (seeded from myoptions.h on reset)
-  es_standby_wanted = config.store.es8388.es_standby;
   es_sleeping = false;
   applyEs8388Settings();
 
@@ -117,6 +116,17 @@ void Player::setEs8388Out(ES8388::ES8388_OUT out, uint8_t vol, int8_t balance)
 void Player::applyEs8388Settings()
 {
     es8388_t &e = config.store.es8388;
+
+    // es_standby is cached in es_standby_wanted because setOutputPins() reads it
+    // on every play/stop. Re-sync it here so a stored-value change (a settings
+    // reset, a config migration) takes effect instead of leaving the cached flag
+    // stale. Disabling standby also has to wake the codec now, otherwise it
+    // stays parked until the next play.
+    if (es_standby_wanted && !e.es_standby) {
+        es.wake();
+        es_sleeping = false;
+    }
+    es_standby_wanted = e.es_standby;
 
     // Volumes and mutes
     es.volume(ES8388::ES_MAIN, e.es_master_vol);
