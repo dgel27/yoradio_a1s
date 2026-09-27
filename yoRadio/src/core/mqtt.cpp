@@ -10,8 +10,31 @@
 AsyncMqttClient mqttClient;
 TimerHandle_t mqttReconnectTimer;
 char topic[140], status[BUFLEN*3], vol[5], buf[20];
+// Set once the client has been pointed at a broker. mqttClient keeps retrying on
+// its own timer, so a settings change has to be able to tell "not configured
+// yet" from "configured, just not connected".
+static bool mqttConfigured = false;
+
+bool mqttEnabled() {
+  return config.mqttEnabled();
+}
+
+/* Build a "<root>/<leaf>" topic into the shared scratch buffer. Returns false
+   if the result would not fit, so a too-long configured topic is ignored rather
+   than overflowing. */
+static bool mqttMakeTopic(const char *leaf) {
+  if (!mqttEnabled()) return false;
+  const char *root = config.store.mqtt.topic;
+  int n = snprintf(topic, sizeof(topic), "%s%s", root, leaf);
+  if (n < 0 || (size_t)n >= sizeof(topic)) {
+    topic[0] = '\0';
+    return false;
+  }
+  return true;
+}
 
 void connectToMqtt() {
+  if (!mqttConfigured || !mqttEnabled()) return;
   mqttClient.connect();
 }
 
@@ -20,18 +43,36 @@ void mqttInit() {
   mqttClient.onConnect(onMqttConnect);
   mqttClient.onDisconnect(onMqttDisconnect);
   mqttClient.onMessage(onMqttMessage);
-  if(strlen(MQTT_USER)>0) mqttClient.setCredentials(MQTT_USER, MQTT_PASS);
-  mqttClient.setServer(MQTT_HOST, MQTT_PORT);
-  memset(topic, 0, 140);
-  sprintf(topic, "%s%s", MQTT_ROOT_TOPIC, "connection");
-  mqttClient.setWill(topic, 0, MQTT_RETAIN_ONLINE, "offline");
+  mqttReconfigure();
+}
+
+/* Apply config.store.mqtt to the client: point it at the broker, set the LWT and
+   (re)start connecting. Called at boot and whenever the user edits the settings,
+   so it must be safe to call repeatedly. */
+void mqttReconfigure() {
+  // Drop any existing session first. Without this the old LWT stays registered
+  // on the previous broker and the old subscribe is never undone.
+  if (mqttConfigured) mqttClient.disconnect(true);
+  mqttConfigured = false;
+
+  if (!mqttEnabled()) {
+    // Empty host means the user turned MQTT off. Stop the retry loop so we do not
+    // spin on a broker that is deliberately not configured.
+    if (mqttReconnectTimer) xTimerStop(mqttReconnectTimer, 0);
+    return;
+  }
+
+  if (strlen(MQTT_USER) > 0) mqttClient.setCredentials(MQTT_USER, MQTT_PASS);
+  mqttClient.setServer(config.store.mqtt.host, config.store.mqtt.port);
+  if (mqttMakeTopic("connection")) {
+    mqttClient.setWill(topic, 0, MQTT_RETAIN_ONLINE, "offline");
+  }
+  mqttConfigured = true;
   connectToMqtt();
 }
 
 void onMqttConnect(bool sessionPresent) {
-  memset(topic, 0, 140);
-  sprintf(topic, "%s%s", MQTT_ROOT_TOPIC, "command");
-  mqttClient.subscribe(topic, 2);
+  if (mqttMakeTopic("command")) mqttClient.subscribe(topic, 2);
   mqttPublishOnline();
   mqttPublishStatus();
   mqttPublishVolume();
@@ -39,47 +80,41 @@ void onMqttConnect(bool sessionPresent) {
 }
 
 void mqttPublishOnline() {
-  if(mqttClient.connected()){
-    memset(topic, 0, 140);
+  if(mqttClient.connected() && mqttMakeTopic("connection")){
     memset(status, 0, BUFLEN*3);
-    sprintf(topic, "%s%s", MQTT_ROOT_TOPIC, "connection");
     sprintf(status, "%s", "online");
     mqttClient.publish(topic, 0, MQTT_RETAIN_ONLINE, status);
   }
 }
 
 void mqttPublishStatus() {
-  if(mqttClient.connected()){
-    memset(topic, 0, 140);
+  if(mqttClient.connected() && mqttMakeTopic("status")){
     memset(status, 0, BUFLEN*3);
-    sprintf(topic, "%s%s", MQTT_ROOT_TOPIC, "status");
     sprintf(status, "{\"status\": %d, \"station\": %d, \"name\": \"%s\", \"title\": \"%s\", \"on\": %d}", player.status()==PLAYING?1:0, config.lastStation(), config.station.name, config.station.title, config.store.dspon);
     mqttClient.publish(topic, 0, MQTT_RETAIN, status);
   }
 }
 
 void mqttPublishPlaylist() {
-  if(mqttClient.connected()){
-    memset(topic, 0, 140);
+  if(mqttClient.connected() && mqttMakeTopic("playlist")){
     memset(status, 0, BUFLEN*3);
-    sprintf(topic, "%s%s", MQTT_ROOT_TOPIC, "playlist");
     sprintf(status, "http://%s%s", WiFi.localIP().toString().c_str(), PLAYLIST_PATH);
     mqttClient.publish(topic, 0, MQTT_RETAIN, status);
   }
 }
 
 void mqttPublishVolume(){
-  if(mqttClient.connected()){
-    memset(topic, 0, 140);
+  if(mqttClient.connected() && mqttMakeTopic("volume")){
     memset(vol, 0, 5);
-    sprintf(topic, "%s%s", MQTT_ROOT_TOPIC, "volume");
     sprintf(vol, "%d", config.store.volume);
     mqttClient.publish(topic, 0, MQTT_RETAIN, vol);
   }
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason) {
-  if (WiFi.isConnected()) {
+  // Only keep retrying while a broker is actually configured. If the user
+  // cleared the host, mqttReconfigure() has already stopped the timer.
+  if (mqttConfigured && mqttEnabled() && WiFi.isConnected()) {
     xTimerStart(mqttReconnectTimer, 0);
   }
 }

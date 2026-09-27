@@ -148,6 +148,12 @@ void Config::_setupVersion(){
       setEs8388Defaults();
 #endif
       break;
+    case 6:
+      // v7 added store.mqtt (runtime broker host/port/root topic). Seed from the
+      // mqttoptions.h defaults; without this the new EEPROM bytes are junk, and a
+      // junk host string would make it dial a random address on every boot.
+      setMqttDefaults();
+      break;
     default:
       break;
   }
@@ -414,6 +420,7 @@ void Config::setDefaults() {
 #ifdef ES8388_ENABLE
   setEs8388Defaults();
 #endif
+  setMqttDefaults();
   eepromWrite(EEPROM_START, store);
 }
 
@@ -816,6 +823,23 @@ void Config::setEs8388Defaults(){
   saveValue(&store.es8388, store.es8388, true, true);
 }
 #endif
+
+void Config::setMqttDefaults(){
+#ifdef MQTT_ROOT_TOPIC
+  strlcpy(store.mqtt.host, MQTT_HOST, sizeof(store.mqtt.host));
+  store.mqtt.port = MQTT_PORT;
+  strlcpy(store.mqtt.topic, MQTT_ROOT_TOPIC, sizeof(store.mqtt.topic));
+#else
+  // No mqttoptions.h in the tree: leave the broker unset so MQTT stays off
+  // rather than trying to reach a broker that does not exist.
+  store.mqtt.host[0] = '\0';
+  store.mqtt.port = 1883;
+  strlcpy(store.mqtt.topic, "yoradio/", sizeof(store.mqtt.topic));
+#endif
+  // force=true for the same reason as setEs8388Defaults(): the fields were
+  // assigned just above, so the "already equal" guard would skip the write.
+  saveValue(&store.mqtt, store.mqtt, true, true);
+}
 
 void Config::setDspOn(bool dspon, bool saveval){
   if(saveval){

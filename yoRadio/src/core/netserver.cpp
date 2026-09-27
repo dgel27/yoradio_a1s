@@ -277,6 +277,7 @@ void NetServer::processQueue(){
             if (ENC_BTNL != 255 || ENC2_BTNL != 255 || dbgact)  act += F("\"group_encoder\",");
             if (IR_PIN != 255 || dbgact)                        act += F("\"group_ir\",");
             if (ES8388_ENABLE || dbgact)                        act += F("\"group_es8388\",");
+            if (MQTT_ROOT_TOPIC || dbgact)                      act += F("\"group_mqtt\",");
           }
                                                                 act = act.substring(0, act.length() - 1);
           sprintf (wsbuf, "{\"act\":[%s]}", act.c_str());
@@ -351,7 +352,12 @@ void NetServer::processQueue(){
                                   e.es_mic_pga, e.es_mic_sel, e.es_mic_bias, e.es_standby);
         }
 #endif
-                                  break;      case STATION:       requestOnChange(STATIONNAME, clientId); requestOnChange(ITEM, clientId); break;
+                                  break;
+      case GETMQTT:      snprintf (wsbuf, 200, "{\"mqhost\":\"%s\",\"mqport\":%d,\"mqtopic\":\"%s\",\"mqen\":%d}",
+                                  config.store.mqtt.host, (int)config.store.mqtt.port,
+                                  config.store.mqtt.topic, config.mqttEnabled() ? 1 : 0);
+                                  break;
+      case STATION:       requestOnChange(STATIONNAME, clientId); requestOnChange(ITEM, clientId); break;
       case STATIONNAME:   sprintf (wsbuf, "{\"nameset\": \"%s\"}", config.station.name); break;
       case ITEM:          sprintf (wsbuf, "{\"current\": %d}", config.lastStation()); break;
       case TITLE:         sprintf (wsbuf, "{\"meta\": \"%s\"}", config.station.title); telnet.printf("##CLI.META#: %s\n> ", config.station.title); break;
@@ -431,6 +437,7 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
       if (strcmp(cmd, "getcontrols") == 0 ) { requestOnChange(GETCONTROLS, clientId); return; }
       if (strcmp(cmd, "getweather") == 0  ) { requestOnChange(GETWEATHER, clientId);  return; }
       if (strcmp(cmd, "getes8388") == 0  ) { requestOnChange(GETES8388, clientId);  return; }
+      if (strcmp(cmd, "getmqtt") == 0    ) { requestOnChange(GETMQTT, clientId);    return; }
       if (strcmp(cmd, "getactive") == 0   ) { requestOnChange(GETACTIVE, clientId);   return; }
       if (strcmp(cmd, "newmode") == 0     ) { newConfigMode = atoi(val); requestOnChange(CHANGEMODE, 0); return; }
       if (strcmp(cmd, "smartstart") == 0) {
@@ -669,6 +676,33 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
 
 #endif // ES8388_ENABLE
 
+      // --- MQTT broker settings ---
+      // Each field is persisted on its own. mqttReconfigure() is only called
+      // once all three arrive, so a user typing the host then the port does not
+      // cause a reconnect in between. An empty host disables MQTT.
+      if (strcmp(cmd, "mqtthost") == 0 || strcmp(cmd, "mqttport") == 0 ||
+          strcmp(cmd, "mqtttopic") == 0) {
+        if (strcmp(cmd, "mqtthost") == 0) {
+          config.saveValue(config.store.mqtt.host, val, MQTT_HOST_LENGTH);
+        } else if (strcmp(cmd, "mqttport") == 0) {
+          int p = iv;
+          if (p < 1) p = 1;
+          if (p > 65535) p = 65535;
+          config.saveValue(&config.store.mqtt.port, (uint16_t)p);
+        } else {
+          config.saveValue(config.store.mqtt.topic, val, MQTT_TOPIC_LENGTH);
+        }
+        mqttReconfigure();
+        requestOnChange(GETMQTT, clientId);
+        return;
+      }
+      if (strcmp(cmd, "mqttreset") == 0) {
+        config.setMqttDefaults();
+        mqttReconfigure();
+        requestOnChange(GETMQTT, clientId);
+        return;
+      }
+
 
 
       if (strcmp(cmd, "volsteps") == 0) {
@@ -789,6 +823,12 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
           return;
         }
 #endif
+        if (strcmp(val, "mqtt") == 0) {
+          config.setMqttDefaults();
+          mqttReconfigure();
+          requestOnChange(GETMQTT, clientId);
+          return;
+        }
       } /*  EOF RESETS  */
       if (strcmp(cmd, "volume") == 0) {
         uint8_t v = atoi(val);
@@ -1076,11 +1116,16 @@ void handleHTTPArgs(AsyncWebServerRequest * request) {
       DBGVB("[%s] play=%d", __func__, id);
     }
     if (request->hasArg("burl")) {
+      // player.burl only exists when MQTT support is compiled in, so this has
+      // to be guarded too - otherwise the tree fails to build without
+      // mqttoptions.h.
+#ifdef MQTT_ROOT_TOPIC
       AsyncWebParameter* p = request->getParam("burl", request->method() == HTTP_POST);
       if (p->value().length() + 1 <= sizeof(player.burl)) {
         strlcpy(player.burl, p->value().c_str(), sizeof(player.burl));
         DBGVB("[%s] burl=%s", __func__, player.burl);
       }
+#endif
       commandFound=true;
     }
     if (request->hasArg("vol")) {

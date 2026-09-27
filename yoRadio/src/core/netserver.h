@@ -33,7 +33,8 @@ enum requestType_e : uint8_t
                         SDINIT=25,
                         GETPLAYERMODE=26,
                         CHANGEMODE=27,
-                        GETES8388=28 };
+                        GETES8388=28,
+                        GETMQTT=29 };
                         
 enum import_e      : uint8_t  { IMDONE=0, IMPL=1, IMWIFI=2 };
 

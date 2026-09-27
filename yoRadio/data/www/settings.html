@@ -19,6 +19,7 @@
       <div class="navitem group group_display group_nextion hidden" data-target="group_display">screen</div>
       <div class="navitem group group_controls hidden" data-target="group_controls">controls</div>
       <div class="navitem group group_es8388 hidden" data-target="group_es8388">es8388</div>
+      <div class="navitem group group_mqtt hidden" data-target="group_mqtt">mqtt</div>
       <div class="navitem group group_timezone hidden" data-target="group_timezone">timezone</div>
       <div class="navitem group group_wifi hidden" data-target="group_wifi">wifi</div>
       <div class="navitem group group_weather hidden" data-target="group_weather">weather</div>
@@ -252,6 +253,32 @@
           </div>
 
          </section>
+
+        <a name="mqtt"></a>
+        <section class="group group_mqtt hidden" id="group_mqtt">
+          <div class="title"><span>MQTT</span></div><div class="reset" data-name="mqtt"></div>
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Broker host &mdash; leave empty to disable</span>
+              <input type="text" id="mqtthost" class="textinput" name="mqtthost" value="" maxlength="31" placeholder="192.168.1.57" autocomplete="off" />
+            </div>
+          </div>
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Broker port</span>
+              <input type="number" id="mqttport" class="textinput" name="mqttport" value="1883" maxlength="5" min="1" max="65535" />
+            </div>
+          </div>
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Root topic</span>
+              <input type="text" id="mqtttopic" class="textinput" name="mqtttopic" value="" maxlength="47" placeholder="yoradio/lab/" autocomplete="off" />
+            </div>
+          </div>
+          <div class="flex-row last">
+            <div class="infoitem">status: <span id="mqttstatus">-</span></div>
+          </div>
+        </section>
 
 
        

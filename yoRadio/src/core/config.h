@@ -41,6 +41,11 @@
 #define MAX_PLAY_MODE   1
 #define WEATHERKEY_LENGTH 58
 #define MDNS_LENGTH 24
+/* mqtt_t sizing. The topic is a prefix that gets "/status", "/command" etc.
+   appended, so it must be long enough for a nested topic plus a suffix but
+   short enough to stay inside mqtt.cpp's 140-byte scratch buffer. */
+#define MQTT_HOST_LENGTH 32
+#define MQTT_TOPIC_LENGTH 48
 
 #if SDC_CS!=255
   #define USE_SD
@@ -49,7 +54,7 @@
 #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
   #define ESP_ARDUINO_3 1
 #endif
-#define CONFIG_VERSION  6
+#define CONFIG_VERSION  7
 
 enum playMode_e      : uint8_t  { PM_WEB=0, PM_SDCARD=1 };
 enum BitrateFormat { BF_UNCNOWN, BF_MP3, BF_AAC, BF_FLAC, BF_OGG, BF_WAV };
@@ -85,6 +90,22 @@ struct theme_t {
   uint16_t plcurrentbg;
   uint16_t plcurrentfill;
   uint16_t playlist[5];
+};
+
+// MQTT broker settings, editable from the web UI / telnet. Seeded from
+// mqttoptions.h on reset, then owned by the user. An empty host disables MQTT
+// entirely (no connect attempt, no reconnect timer), so clearing the field is
+// how you turn it off without reflashing.
+struct mqtt_t
+{
+    char     host[MQTT_HOST_LENGTH];   // broker hostname or IP; "" = disabled
+    uint16_t port;                     // 1..65535
+    char     topic[MQTT_TOPIC_LENGTH]; // root topic, e.g. "yoradio/lab/"
+
+    // so config.saveValue(&store.mqtt, ...) can skip redundant writes
+    bool operator==(const mqtt_t &o) const {
+        return memcmp(this, &o, sizeof(mqtt_t)) == 0;
+    }
 };
 
 #ifdef ES8388_ENABLE
@@ -205,6 +226,7 @@ struct config_t
 #ifdef ES8388_ENABLE
   es8388_t  es8388;  // runtime ES8388 settings, seeded from myoptions.h
 #endif
+  mqtt_t    mqtt;    // broker host/port/root topic, seeded from mqttoptions.h
 };
 
 /* Where config_t lives in the emulated EEPROM.
@@ -335,6 +357,10 @@ class Config {
     /* Seed store.es8388 from the myoptions.h compile-time defaults. */
     void setEs8388Defaults();
 #endif
+    /* Seed store.mqtt from the mqttoptions.h compile-time defaults. */
+    void setMqttDefaults();
+    /* True when a broker host is configured, i.e. MQTT should run. */
+    bool mqttEnabled() const { return store.mqtt.host[0] != '\0'; }
     void sleepForAfter(uint16_t sleepfor, uint16_t sleepafter=0);
     void bootInfo();
     void doSleepW();

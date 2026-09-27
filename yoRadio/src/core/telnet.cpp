@@ -8,6 +8,9 @@
 #ifdef ES8388_ENABLE
   #include "../audioES8388/ES8388.h"
 #endif // ES8388_ENABLE   
+#ifdef MQTT_ROOT_TOPIC
+  #include "mqtt.h"
+#endif // MQTT_ROOT_TOPIC
 
 Telnet telnet;
 
@@ -226,6 +229,12 @@ void Telnet::printHelp(uint8_t clientId) {
   printf(clientId, "  esmono on|off           ES8388 mono/stereo\n");
   printf(clientId, "  esspk mute|unmute       ES8388 speaker amp mute\n");
   printf(clientId, "  esregr <reg> | esregw <reg> <val> | esdump   register debug\n");
+  #endif
+  #ifdef MQTT_ROOT_TOPIC
+  printf(clientId, "  mqtthost <host|->       MQTT broker host; \"-\" clears it (disables MQTT)\n");
+  printf(clientId, "  mqttport <n>            MQTT broker port (default 1883)\n");
+  printf(clientId, "  mqtttopic <prefix>      MQTT root topic, e.g. yoradio/lab/\n");
+  printf(clientId, "  mqttreset               MQTT settings back to mqttoptions.h defaults\n");
   #endif
   printf(clientId, "Most commands also accept the cli. prefix and (args) form.\n> ");
 }
@@ -688,6 +697,51 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   }    
       
 #endif //ES8388_ENABLE
+
+#ifdef MQTT_ROOT_TOPIC
+  if (strncmp(str, "mqtthost ", 9) == 0) {
+      const char *h = str + 9;
+      if (*h == '-' || *h == '\0') {
+          // "-" clears the host, which disables MQTT (config.mqttEnabled() is
+          // simply "host is non-empty").
+          config.saveValue(config.store.mqtt.host, "", MQTT_HOST_LENGTH);
+          mqttReconfigure();
+          printf(clientId, "#MQTT# broker host cleared - MQTT disabled\n> ");
+      } else {
+          config.saveValue(config.store.mqtt.host, h, MQTT_HOST_LENGTH);
+          mqttReconfigure();
+          printf(clientId, "#MQTT# broker host: %s:%d\n> ", config.store.mqtt.host, config.store.mqtt.port);
+      }
+      return;
+  }
+  if (sscanf(str, "mqttport %d", &svol) == 1) {
+      if (svol < 1) svol = 1;
+      if (svol > 65535) svol = 65535;
+      config.saveValue(&config.store.mqtt.port, (uint16_t)svol);
+      mqttReconfigure();
+      printf(clientId, "#MQTT# broker port: %d\n> ", svol);
+      return;
+  }
+  if (strncmp(str, "mqtttopic ", 10) == 0) {
+      config.saveValue(config.store.mqtt.topic, str + 10, MQTT_TOPIC_LENGTH);
+      mqttReconfigure();
+      printf(clientId, "#MQTT# root topic: %s\n> ", config.store.mqtt.topic);
+      return;
+  }
+  if (strcmp(str, "mqttreset") == 0) {
+      config.setMqttDefaults();
+      mqttReconfigure();
+      printf(clientId, "#MQTT# settings restored to defaults: %s:%d %s\n> ",
+             config.store.mqtt.host, config.store.mqtt.port, config.store.mqtt.topic);
+      return;
+  }
+  if (strcmp(str, "mqttstatus") == 0) {
+      printf(clientId, "#MQTT# %s host=%s port=%d topic=%s\n> ",
+             config.mqttEnabled() ? "enabled" : "disabled (no host)",
+             config.store.mqtt.host, config.store.mqtt.port, config.store.mqtt.topic);
+      return;
+  }
+#endif //MQTT_ROOT_TOPIC
   
   telnet.printf(clientId, "##CMD_ERROR#\tunknown command <%s>\n> ", str);
 }
