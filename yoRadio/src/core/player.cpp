@@ -81,7 +81,14 @@ void Player::init() {
   
   setBalance(config.store.balance);
   setTone(config.store.bass, config.store.middle, config.store.trebble);
+#ifdef ES8388_ENABLE
+  // Software volume is pinned to unity: the main-page volume is attenuated in
+  // the DAC's master register instead (see applyEs8388Volume), so nothing
+  // should scale the samples before they get there.
+  setVolume(254);
+#else
   setVolume(0);
+#endif
   _spmute = config.store.spmute != 0; // restore user speaker-mute
   _status = STOPPED;
   _volTimer=false;
@@ -128,8 +135,11 @@ void Player::applyEs8388Settings()
     }
     es_standby_wanted = e.es_standby;
 
-    // Volumes and mutes
-    es.volume(ES8388::ES_MAIN, e.es_master_vol);
+    // Volumes and mutes.
+    // The master register is deliberately NOT set here: it is driven by the
+    // main-page volume (see applyEs8388Volume), so writing e.es_master_vol here
+    // would fight it. The field is kept in config_t only so its size and the
+    // EEPROM layout stay stable; it is no longer a user setting.
     setEs8388Out(ES8388::ES_OUT1, e.es_vol1, e.es_bal1);
     setEs8388Out(ES8388::ES_OUT2, e.es_vol2, e.es_bal2);
     es.mute(ES8388::ES_MAIN, e.es_mute_main);
@@ -141,8 +151,10 @@ void Player::applyEs8388Settings()
     es.mono(e.es_mono);
     es.vpp_scale(e.es_vpp > 3 ? 3 : e.es_vpp);
 
-    // DAC Control 3 (0x19): soft volume ramp
-    es.volume_ramp(e.es_soft_ramp ? (e.es_ramp_rate > 3 ? 3 : e.es_ramp_rate) : 0);
+    // DAC Control 3 (0x19): soft volume ramp. soft_ramp() sets the enable bit
+    // as well as the rate; volume_ramp() only touched the rate, which left the
+    // ramp permanently on and made this setting cosmetic.
+    es.soft_ramp(e.es_soft_ramp != 0, e.es_ramp_rate > 3 ? 3 : e.es_ramp_rate);
 
     // DAC Control 6 (0x1c): de-emphasis, click free, phase invert
     es.deemphasis(e.es_deemph > 3 ? 3 : e.es_deemph);
@@ -160,6 +172,81 @@ void Player::applyEs8388Settings()
     es.mic_input(e.es_mic_sel > 2 ? 2 : e.es_mic_sel);
     es.mic_bias(e.es_mic_bias);
     es.adc_power(e.es_adc);
+}
+
+/* user volume (0..254) -> ES8388::volume() argument (0..192).
+
+   ES8388::volume() takes an ATTENUATION and writes 192 - v to registers 26/27,
+   so 0 means 0 dB (loudest) and 192 means -96 dB. Its argument therefore counts
+   the wrong way round from the register: to make user 254 the loudest we have to
+   hand it 0, and user 0 (mute) has to hand it 192.
+
+   That makes the main-page slider a linear-in-dB taper, where the old software
+   multiply was linear in amplitude and therefore spent most of its travel
+   crowded into the top few dB.
+
+   ovol is the per-station trim from playlist.csv, applied as a dB offset on top
+   (positive ovol = louder, i.e. less attenuation). It is a separate offset rather
+   than being folded into the mapping scale, so that at ovol 0 every one of the
+   193 values still maps back to a distinct user value and a volume-button detent
+   can never round onto the value it started from. */
+uint8_t Player::volumeToEs8388(uint8_t userVolume) const
+{
+    int off = (int)lround(-config.station.ovol * 0.5);
+    long atten = lround((double)userVolume * 192.0 / 254.0) - off;
+    if (atten < 0) atten = 0;
+    if (atten > 192) atten = 192;
+    return (uint8_t)atten;
+}
+
+/* Inverse of volumeToEs8388(), used when stepping so a detent lands on an exact
+   value instead of drifting through the 0..254 domain. */
+uint8_t Player::volumeFromEs8388(int atten) const
+{
+    if (atten < 0) atten = 0;
+    if (atten > 192) atten = 192;
+    int off = (int)lround(-config.station.ovol * 0.5);
+    long base = atten + off;
+    if (base < 0) base = 0;
+    if (base > 192) base = 192;
+    long v = lround((double)base * 254.0 / 192.0);
+    if (v < 0) v = 0;
+    if (v > 254) v = 254;
+    return (uint8_t)v;
+}
+
+void Player::stepVolumeBy(int steps)
+{
+    int reg = volumeToEs8388(config.store.volume);
+    int target = reg + steps;
+    if (target < 0) target = 0;
+    if (target > 192) target = 192;
+    // If rounding lands back on the current user value, nudge one register
+    // further so the step is never silently swallowed.
+    uint8_t v = volumeFromEs8388(target);
+    if (v == config.store.volume) {
+        if (target > reg && target < 192) v = volumeFromEs8388(target + 1);
+        else if (target < reg && target > 0) v = volumeFromEs8388(target - 1);
+    }
+    setVol(v);
+}
+
+void Player::applyEs8388SoftRamp()
+{
+    uint8_t rate = config.store.es8388.es_ramp_rate > 3 ? 3 : config.store.es8388.es_ramp_rate;
+    es.soft_ramp(config.store.es8388.es_soft_ramp != 0, rate);
+}
+
+/* The main-page volume now attenuates in the DAC instead of in software.
+   The soft ramp is forced on here regardless of the stored preference: a step
+   on the master register is a real output discontinuity without it, and with it
+   the codec ramps 0.5 dB per few LRCK, which is inaudible even when a slider or
+   the encoder is moving quickly. */
+void Player::applyEs8388Volume(uint8_t userVolume)
+{
+    uint8_t rate = config.store.es8388.es_ramp_rate > 3 ? 3 : config.store.es8388.es_ramp_rate;
+    es.soft_ramp(true, rate);
+    es.volume(ES8388::ES_MAIN, volumeToEs8388(userVolume));
 }
 
 /* Enable/disable automatic standby. Turning it off wakes the codec at once if
@@ -250,7 +337,11 @@ void Player::loop() {
       }
       case PR_VOL: {
         config.setVolume(requestP.payload);
+#ifdef ES8388_ENABLE
+        applyEs8388Volume(requestP.payload);
+#else
         Audio::setVolume(volToI2S(requestP.payload));
+#endif
         break;
       }
       #ifdef USE_SD
@@ -445,6 +536,12 @@ void Player::toggle() {
 }
 
 void Player::stepVol(bool up) {
+#ifdef ES8388_ENABLE
+  // Step in master-register space so a detent is always at least one 0.5 dB
+  // step. volsteps keeps its meaning as a multiplier, but now in 0.5 dB units
+  // rather than 0..254 user units, so it lands on real register values.
+  stepVolumeBy(up ? (int)config.store.volsteps : -(int)config.store.volsteps);
+#else
   if (up) {
     if (config.store.volume <= 254 - config.store.volsteps) {
       setVol(config.store.volume + config.store.volsteps);
@@ -458,6 +555,7 @@ void Player::stepVol(bool up) {
       setVol(0);
     }
   }
+#endif
 }
 
 uint8_t Player::volToI2S(uint8_t volume) {
@@ -468,7 +566,11 @@ uint8_t Player::volToI2S(uint8_t volume) {
 }
 
 void Player::_loadVol(uint8_t volume) {
+#ifdef ES8388_ENABLE
+  applyEs8388Volume(volume);
+#else
   setVolume(volToI2S(volume));
+#endif
 }
 
 void Player::setVol(uint8_t volume) {

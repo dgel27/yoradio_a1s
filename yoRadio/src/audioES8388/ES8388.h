@@ -98,6 +98,10 @@ public:
     /* DAC soft volume ramp: 0.5dB per N LRCK, n = 0..3 -> 4/32/64/128 */
     void volume_ramp(const uint8_t n);
 
+    /* Soft ramp enable (bit 5) together with its rate. volume_ramp() only sets
+       the rate, so use this to actually switch the ramp on/off. */
+    void soft_ramp(const bool on, const uint8_t rate);
+
     /* Analog output impedance: false = 1.5k (default), true = 40k */
     void output_impedance(const bool high);
 

@@ -204,7 +204,7 @@ void Telnet::printHelp(uint8_t clientId) {
   printf(clientId, "  discon                 Disconnect wifi\n");
   printf(clientId, "  boot | reset           Reboot / factory reset (!)\n");
   #ifdef ES8388_ENABLE
-  printf(clientId, "  esvol <n>               ES8388 main digital volume 0-192\n");
+  printf(clientId, "  esvol <n>               set volume 0-254 (alias of the main-page volume)\n");
   printf(clientId, "  esvol1 <n>              ES8388 OUT1 (headphone) volume 0-33\n");
   printf(clientId, "  esvol2 <n>              ES8388 OUT2 (speaker) volume 0-33\n");
   printf(clientId, "  esch1bal <n>            ES8388 OUT1 L/R balance -6..+6\n");
@@ -592,10 +592,15 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
       return;
   }
   if (sscanf(str, "esvol %d", &svol) == 1) {
-    if (svol < 0) svol = 0; if (svol > 192) svol = 192;
-    printf(clientId, "#ES8388.VOL# set Main volume: %d (0-192) \n> ", svol);
-    config.saveValue(&E.es_master_vol, (uint8_t)svol);
-    es.volume(ES8388::ES_MAIN, (uint8_t)svol);
+    if (svol < 0) svol = 0; if (svol > 254) svol = 254;
+    // This used to write the DAC master register directly, which now belongs to
+    // the main-page volume and would be overwritten by the next slider or
+    // encoder move. It sets the main-page volume instead, in the same 0..254
+    // domain as every other volume source, so the value stays coherent and is
+    // visible on the main page. There is no separate master-volume setting any
+    // more.
+    printf(clientId, "#VOL# set volume: %d (0-254) \n> ", svol);
+    player.setVol((uint8_t)svol);
       return;
   }
   if (sscanf(str, "esstereo %d", &svol) == 1) {

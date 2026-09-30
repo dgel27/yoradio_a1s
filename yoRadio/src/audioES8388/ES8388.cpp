@@ -232,6 +232,17 @@ void ES8388::volume_ramp(const uint8_t n)
     rmw(*this, ES8388_DACCONTROL3, (3 << 6), (uint8_t)(r << 6));
 }
 
+/* Soft ramp is a separate enable bit from the rate, so the rate setter alone can
+   never switch it off. The two had to be combined or the "soft volume ramp"
+   setting was cosmetic: it changed the rate while bit 5 stayed set by the init
+   sequence, so the ramp was on regardless. */
+void ES8388::soft_ramp(const bool on, const uint8_t rate)
+{
+    uint8_t r = rate > 3 ? 3 : rate;
+    uint8_t v = (uint8_t)((r << 6) | (on ? (1 << 5) : 0));
+    rmw(*this, ES8388_DACCONTROL3, (3 << 6) | (1 << 5), v);
+}
+
 /* DAC Control 23 (0x2d): VROI(4) - output impedance reference */
 
 void ES8388::output_impedance(const bool high)

@@ -119,7 +119,9 @@ struct mqtt_t
 struct es8388_t
 {
     // --- volumes ---
-    uint8_t es_master_vol;   // 0..192 digital volume, 192 = 0dB
+    uint8_t es_master_vol;   // UNUSED: kept only so sizeof(config_t) and the EEPROM
+                             // layout stay stable. The main-page volume drives the
+                             // DAC master register directly (Player::applyEs8388Volume).
     uint8_t es_vol1;         // 0..33 LOUT1/ROUT1 analog volume, 30 = 0dB
     uint8_t es_vol2;         // 0..33 LOUT2/ROUT2 analog volume, 30 = 0dB
     int8_t  es_bal1;         // -6..+6 LOUT1/ROUT1 L/R balance

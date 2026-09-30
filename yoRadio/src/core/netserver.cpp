@@ -346,8 +346,11 @@ void NetServer::processQueue(){
 #ifdef ES8388_ENABLE
         {
           es8388_t &e = config.store.es8388;
+          // esmv is the MAIN-PAGE volume (0..254), not the old es_master_vol:
+          // the master register is now driven by that slider, so reporting it
+          // keeps the settings page showing the level actually in effect.
           sprintf (wsbuf, "{\"esmv\":%d,\"esv1\":%d,\"esb1\":%d,\"esv2\":%d,\"esb2\":%d,\"esse\":%d,\"esmu\":%d,\"esvpp\":%d,\"esde\":%d,\"esmo\":%d,\"esra\":%d,\"esvr\":%d,\"esli\":%d,\"esad\":%d,\"espg\":%d,\"esmi\":%d,\"esmb\":%d,\"essb\":%d}",
-                                  e.es_master_vol, e.es_vol1, (int)e.es_bal1, e.es_vol2, (int)e.es_bal2,
+                                  config.store.volume, e.es_vol1, (int)e.es_bal1, e.es_vol2, (int)e.es_bal2,
                                   e.es_stereo_eff, config.store.spmute, e.es_vpp, e.es_deemph,
                                   e.es_mono, e.es_soft_ramp, e.es_vroi, e.es_linein, e.es_adc,
                                   e.es_mic_pga, e.es_mic_sel, e.es_mic_bias, e.es_standby);
@@ -633,12 +636,12 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
       uint8_t u8 = (uint8_t)atoi(val);
       int   iv = atoi(val);
 
-      if (strcmp(cmd, "esmastervol") == 0) {
-        if (u8 > 192) u8 = 192;
-        config.saveValue(&E.es_master_vol, u8);
-        es.volume(ES8388::ES_MAIN, u8);
-        return;
-      }
+      // NOTE: there is deliberately no "esmastervol" handler. The main-page
+      // volume drives the DAC master register, so accepting a second writer here
+      // would let the settings page and the main page overwrite each other.
+      // The stored es_master_vol field is left in place only to keep
+      // sizeof(config_t) stable.
+
       if (strcmp(cmd, "esstereo") == 0) {
         if (u8 > 7) u8 = 7;
         config.saveValue(&E.es_stereo_eff, u8);

@@ -79,6 +79,24 @@ class Player: public Audio {
     /* Push the persisted ES8388 settings to the codec. */
     void applyEs8388Settings();
     void setEs8388Out(ES8388::ES8388_OUT out, uint8_t vol, int8_t balance);
+    /* The main-page volume drives the DAC master register (26/27) rather than
+       the software multiply, so the whole thing is one 0.5 dB-per-step
+       attenuation and both analog outputs follow it. The per-output trims in
+       the ES8388 settings then set the speaker/headphone ratio, which the
+       master register preserves at every volume. */
+    void applyEs8388Volume(uint8_t userVolume);
+    /* userVolume (0..254) <-> ES8388::volume() argument (0..192 attenuation).
+       ES8388::volume() writes 192 - v to registers 26/27, so 0 is the loudest
+       and 192 is -96 dB; user 254 therefore maps to 0 and user 0 to 192. The
+       result is a linear-in-dB taper. ovol, the per-station trim from
+       playlist.csv, is a dB offset on top. volumeFromEs8388() is the inverse,
+       used for stepping. */
+    uint8_t volumeToEs8388(uint8_t userVolume) const;
+    uint8_t volumeFromEs8388(int atten) const;
+    /* Step in register space so a single detent always moves at least one
+       0.5 dB step; a step in the 0..254 user domain can round to the same
+       register and appear dead. */
+    void stepVolumeBy(int steps);
     /* Park/wake the codec with playback; also flips the persisted flag. */
     void setEs8388Standby(bool on);
     /* Mute the amp and silence the codec ahead of a restart. Call this
@@ -88,6 +106,12 @@ class Player: public Audio {
     #endif
     void setResumeFilePos(uint32_t pos) { _resumeFilePos = pos; }
   private:
+    #ifdef ES8388_ENABLE
+    /* Re-apply the soft-ramp rate. The codec's standby/wake sequence rewrites
+       the whole ramp register, so a wake has to restore it or later volume
+       changes inherit a different ramp. */
+    void applyEs8388SoftRamp();
+    #endif
     bool _spmute = false;
 #ifdef ES8388_ENABLE
     bool es_standby_wanted = false; // mirror of config.store.es8388.es_standby
