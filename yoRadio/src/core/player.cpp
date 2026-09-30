@@ -186,14 +186,32 @@ void Player::applyEs8388Settings()
    crowded into the top few dB.
 
    ovol is the per-station trim from playlist.csv, applied as a dB offset on top
-   (positive ovol = louder, i.e. less attenuation). It is a separate offset rather
-   than being folded into the mapping scale, so that at ovol 0 every one of the
-   193 values still maps back to a distinct user value and a volume-button detent
-   can never round onto the value it started from. */
+   rather than folded into the mapping scale, so that at ovol 0 every reachable
+   value still maps back to a distinct user value and a volume-button detent can
+   never round onto the value it started from. The span is ES8388_VOL_SPAN_DB
+   below rather than the codec's full 96 dB. */
+
+/* How much of the codec's range the main-page slider covers, in dB.
+   The register is a pure attenuation in 0.5 dB steps, 0 = 0 dB and 192 = -96 dB.
+   Spanning all 96 dB is correct but unusable: a linear-in-dB taper over the
+   full range leaves roughly three quarters of the slider below the hearing
+   threshold, so the bottom of the travel is a dead zone. 60 dB keeps the
+   0.5 dB steps and a silent bottom while putting normal listening around the
+   middle of the slider. Muting is the amp-enable pin's job, not the slider's. */
+static const int ES8388_VOL_SPAN_DB = 60;
+
+/* Per-station ovol trim, in register steps (0.5 dB each). playlist.csv allows
+   -30..+30, so 0.4 steps per unit gives +/-6 dB - close to what the old
+   software formula actually delivered (it scaled the whole curve, worth about
+   2.6 dB at the top). Positive ovol raises atten, which ES8388::volume()
+   inverts, so positive ovol ends up louder. */
+static const double ES8388_OVOL_STEP = 0.4;
+
 uint8_t Player::volumeToEs8388(uint8_t userVolume) const
 {
-    int off = (int)lround(-config.station.ovol * 0.5);
-    long atten = lround((double)userVolume * 192.0 / 254.0) - off;
+    long atten = 192 - 2 * ES8388_VOL_SPAN_DB
+               + lround(2.0 * ES8388_VOL_SPAN_DB * userVolume / 254.0)
+               + lround(config.station.ovol * ES8388_OVOL_STEP);
     if (atten < 0) atten = 0;
     if (atten > 192) atten = 192;
     return (uint8_t)atten;
@@ -205,11 +223,11 @@ uint8_t Player::volumeFromEs8388(int atten) const
 {
     if (atten < 0) atten = 0;
     if (atten > 192) atten = 192;
-    int off = (int)lround(-config.station.ovol * 0.5);
-    long base = atten + off;
+    long base = atten - lround(config.station.ovol * ES8388_OVOL_STEP);
     if (base < 0) base = 0;
     if (base > 192) base = 192;
-    long v = lround((double)base * 254.0 / 192.0);
+    long v = lround((double)(base - (192 - 2 * ES8388_VOL_SPAN_DB)) * 254.0
+                    / (2.0 * ES8388_VOL_SPAN_DB));
     if (v < 0) v = 0;
     if (v > 254) v = 254;
     return (uint8_t)v;
@@ -218,15 +236,18 @@ uint8_t Player::volumeFromEs8388(int atten) const
 void Player::stepVolumeBy(int steps)
 {
     int reg = volumeToEs8388(config.store.volume);
+    int lo = 192 - 2 * ES8388_VOL_SPAN_DB;   // slider 0, the quiet end
+    int hi = 192;                           // slider 254, the loud end
     int target = reg + steps;
-    if (target < 0) target = 0;
-    if (target > 192) target = 192;
-    // If rounding lands back on the current user value, nudge one register
-    // further so the step is never silently swallowed.
+    if (target < lo) target = lo;
+    if (target > hi) target = hi;
+    // If rounding lands back on the current user value, nudge one step further
+    // so the move is never silently swallowed. Clamp the nudge too, or it can
+    // escape the span.
     uint8_t v = volumeFromEs8388(target);
     if (v == config.store.volume) {
-        if (target > reg && target < 192) v = volumeFromEs8388(target + 1);
-        else if (target < reg && target > 0) v = volumeFromEs8388(target - 1);
+        if (target > reg && target < hi) v = volumeFromEs8388(target + 1);
+        else if (target < reg && target > lo) v = volumeFromEs8388(target - 1);
     }
     setVol(v);
 }
