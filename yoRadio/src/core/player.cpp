@@ -103,19 +103,52 @@ void Player::init() {
 
 #ifdef ES8388_ENABLE
 /* Set one analog output from a volume plus an L/R balance offset.
-   balance -6..+6: positive favours the left channel. */
+   balance -6..+6: positive favours the left channel.
+
+   The per-output volume registers (46/47 for OUT1, 48/49 for OUT2) are 6-bit
+   with 30 = 0 dB, 0 = -45 dB and 33 = +4.5 dB, so the useful travel is almost
+   all downward. The old code applied balance as an offset added to the base and
+   clamped at 33, which meant the favoured channel had nowhere to go: at base 33
+   every value from -6 to +6 produced 33/33 and the control did nothing at all,
+   and at base 30 a request for +6 delivered only +4.5 dB.
+
+   Balance now spreads the pair by 2*|balance| register steps centred on the
+   base, and shifts the whole pair upward only when it would otherwise pass
+   33. That never needs headroom below the floor and gives the full ~18 dB at
+   any base, symmetric in both directions, instead of 0 dB at maximum. At
+   balance 0 the base is returned untouched.
+
+   Because the pair is re-centred rather than pivoted on the base, the mean
+   level can move a little when the base has no room to spare. That is inherent
+   to the register: below about -36 dB the far channel has nowhere left to go,
+   so the only way to keep the tilt is to lift the pair. At audible levels the
+   drift is under 1 dB.
+
+   There is no per-channel mute in this codec: register 4 (DACPOWER) only has
+   enables for the output pairs, and register 25 only has a main-path DAC mute.
+   So -45 dB is the hard floor and one channel always leaks a little; a truly
+   silent side needs the amplifier's own mute, not this. */
 void Player::setEs8388Out(ES8388::ES8388_OUT out, uint8_t vol, int8_t balance)
 {
-    uint8_t base = vol > 33 ? 33 : vol;
+    int base = vol > 33 ? 33 : vol;
     int b = balance;
     if (b > 6) b = 6;
     if (b < -6) b = -6;
-    int l = base, r = base;
-    if (b > 0) l = base + b; else if (b < 0) r = base - b;
-    if (l > 33) l = 33;
-    if (r > 33) r = 33;
-    es.volume_l(out, (uint8_t)l);
-    es.volume_r(out, (uint8_t)r);
+    if (b == 0) {
+        es.volume_l(out, (uint8_t)base);
+        es.volume_r(out, (uint8_t)base);
+        return;
+    }
+    int lo = base - b;   // one register step is 1.5 dB, so 2*b spans ~3 dB per unit
+    int hi = base + b;
+    if (lo > hi) { int t = lo; lo = hi; hi = t; }
+    if (hi > 33) { lo += 33 - hi; hi = 33; }   // slide up, using the +3 dB of headroom
+    if (lo < 0)  { hi -= lo; lo = 0; }         // never past the -45 dB floor
+    if (lo < 0) lo = 0;
+    if (hi > 33) hi = 33;
+    // lo is the attenuated (far) side and hi the favoured one
+    if (b > 0) { es.volume_l(out, (uint8_t)hi); es.volume_r(out, (uint8_t)lo); }
+    else        { es.volume_l(out, (uint8_t)lo); es.volume_r(out, (uint8_t)hi); }
 }
 
 /* Push every persisted ES8388 setting to the chip. Called at boot and after
