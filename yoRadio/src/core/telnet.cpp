@@ -205,8 +205,8 @@ void Telnet::printHelp(uint8_t clientId) {
   printf(clientId, "  boot | reset           Reboot / factory reset (!)\n");
   #ifdef ES8388_ENABLE
   printf(clientId, "  esvol <n>               set volume 0-254 (alias of the main-page volume)\n");
-  printf(clientId, "  esvol1 <n>              ES8388 OUT1 (headphone) volume 0-33\n");
-  printf(clientId, "  esvol2 <n>              ES8388 OUT2 (speaker) volume 0-33\n");
+  printf(clientId, "  esvol1 <n>              ES8388 OUT1 (speaker) volume 0-33\n");
+  printf(clientId, "  esvol2 <n>              ES8388 OUT2 (headphone) volume 0-33\n");
   printf(clientId, "  esch1bal <n>            ES8388 OUT1 L/R balance -6..+6\n");
   printf(clientId, "  esch2bal <n>            ES8388 OUT2 L/R balance -6..+6\n");
   printf(clientId, "  esstereo <n>            ES8388 stereo widening 0-7 (not a tone EQ)\n");
@@ -565,14 +565,14 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   // generic "esvol", because sscanf("esvol %d") also matches "esvol1 30".
   if (sscanf(str, "esvol1 %d", &svol) == 1) {
     if (svol < 0) svol = 0; if (svol > 33) svol = 33;
-    printf(clientId, "#ES8388.VOL1# set OUT1 (headphone) volume: %d (0-33) \n> ", svol);
+    printf(clientId, "#ES8388.VOL1# set OUT1 (speaker) volume: %d (0-33) \n> ", svol);
     config.saveValue(&E.es_vol1, (uint8_t)svol);
     player.setEs8388Out(ES8388::ES_OUT1, (uint8_t)svol, E.es_bal1);
       return;
   }
   if (sscanf(str, "esvol2 %d", &svol) == 1) {
     if (svol < 0) svol = 0; if (svol > 33) svol = 33;
-    printf(clientId, "#ES8388.VOL2# set OUT2 (speaker) volume: %d (0-33) \n> ", svol);
+    printf(clientId, "#ES8388.VOL2# set OUT2 (headphone) volume: %d (0-33) \n> ", svol);
     config.saveValue(&E.es_vol2, (uint8_t)svol);
     player.setEs8388Out(ES8388::ES_OUT2, (uint8_t)svol, E.es_bal2);
       return;
