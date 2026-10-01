@@ -23,11 +23,12 @@
         <div id="nameset">&nbsp;</div>
         <div id="meta">&nbsp;</div>
         <div class="playerbyttonwrap">
+          <div class="playerbytton" id="mutebutton" data-name="hpmutesp"></div>
           <div class="playerbytton" id="prevbutton" data-name="prev"></div>
-          <div class="playerbytton stopped" id="playbutton" data-name="play"></div>
-          <div class="playerbytton" id="nextbutton" data-name="next"></div>
           <div class="playerbytton" id="volmbutton" data-name="volm"></div>
+          <div class="playerbytton stopped" id="playbutton" data-name="play"></div>
           <div class="playerbytton" id="volpbutton" data-name="volp"></div>
+          <div class="playerbytton" id="nextbutton" data-name="next"></div>
           <div class="playerbytton" id="eqalbutton" data-name="equalizer"></div>
         </div>
         <div id="equalizerwrap">
@@ -35,8 +36,8 @@
 				    <ul id="equalizer">
 						  <li>
 						  <li>
-								balance<span class="eqinfo" id="eqbalinfo">0</span>
-								<input type="range" id="eqbal" class="slider" data-slaveid="eqbalinfo" name="balance" min="-16" max="16" value="0">
+								stereo width<span class="eqinfo" id="esstereoinfo">4</span>
+								<input type="range" id="es_stereo" class="slider" data-slaveid="esstereoinfo" name="esstereo" min="0" max="7" value="4">
 							</li>
 						  <li>
 						  <li>
@@ -50,6 +51,11 @@
 						  <li>
 								bass<span class="eqinfo" id="eqbassinfo">0</span>
 								<input type="range" id="eqbass" class="slider" data-slaveid="eqbassinfo" name="bass" min="-16" max="16" value="0">
+						  <li>
+						  <li>
+							speaker balance (LOUT1)<span class="eqinfo" id="esch1balinfo">0</span>
+								<input type="range" id="es_ch1bal" class="slider" data-slaveid="esch1balinfo" name="esch1bal" min="-6" max="6" value="0">
+						  </li>
 						  </li>
 						  <li class="formbuttons">
 						  	<div class="button" id="accept_button" data-name="equalizer">Acceptable...</div>
