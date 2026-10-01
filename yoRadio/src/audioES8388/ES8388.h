@@ -71,8 +71,8 @@ public:
     enum ES8388_OUT
     {
         ES_MAIN, // DAC digital volume, attenuates both outputs
-        ES_OUT1, // LOUT1/ROUT1 = headphone amp (HPOUTL/R on the A1S)
-        ES_OUT2  // LOUT2/ROUT2 = on-board speaker amp (SPOLP/N on the A1S)
+        ES_OUT1, // LOUT1/ROUT1 (regs 46/47) = on-board speaker amp on the A1S
+        ES_OUT2  // LOUT2/ROUT2 (regs 48/49) = headphone amp
     };
 
     bool begin(int sda = -1, int scl = -1, uint32_t frequency = 400000U);
