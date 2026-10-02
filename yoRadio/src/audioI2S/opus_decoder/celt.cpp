@@ -1,3 +1,9 @@
+/* Guarded by DECODER_OPUS: set it to false in myoptions.h (or options.h) and this
+   whole translation unit compiles away. See the AUDIO DECODERS block in
+   src/core/options.h for the cost of each decoder. */
+#include "../../core/options.h"
+#if DECODER_OPUS
+
 /* The CELT decoder is a development of the Xiph.Org Foundation
  * adapted to the ESP32 microcontroller, max 2 channels, no multistream
  *
@@ -3745,3 +3751,4 @@ void unquant_energy_finalise(int16_t *oldEBands, int32_t *fine_quant,
     }
 }
 //----------------------------------------------------------------------------------------------------------------------
+#endif // DECODER_OPUS

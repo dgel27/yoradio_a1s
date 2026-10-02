@@ -1,3 +1,9 @@
+/* Guarded by DECODER_AAC: set it to false in myoptions.h (or options.h) and this
+   whole translation unit compiles away. See the AUDIO DECODERS block in
+   src/core/options.h for the cost of each decoder. */
+#include "../../core/options.h"
+#if DECODER_AAC
+
 /*
  * aac_decoder.cpp
  * libhelix_HAACDECODER
@@ -10218,3 +10224,4 @@ void UnpackSBRChannelPair(int chBase) {
         }
     }
 }
+#endif // DECODER_AAC

@@ -1,3 +1,9 @@
+/* Guarded by DECODER_MP3: set it to false in myoptions.h (or options.h) and this
+   whole translation unit compiles away. See the AUDIO DECODERS block in
+   src/core/options.h for the cost of each decoder. */
+#include "../../core/options.h"
+#if DECODER_MP3
+
 /*
  * mp3_decoder.cpp
  * libhelix_HMP3DECODER
@@ -3802,3 +3808,4 @@ void PolyphaseStereo(short *pcm, int *vbuf, const uint32_t *coefBase){
         pcm += 2;
     }
 }
+#endif // DECODER_MP

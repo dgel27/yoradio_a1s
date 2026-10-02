@@ -1,3 +1,9 @@
+/* Guarded by DECODER_OPUS: set it to false in myoptions.h (or options.h) and this
+   whole translation unit compiles away. See the AUDIO DECODERS block in
+   src/core/options.h for the cost of each decoder. */
+#include "../../core/options.h"
+#if DECODER_OPUS
+
 /*******************************************************************************************************************************************************************************************************
 Copyright (c) 2006-2011, Skype Limited. All rights reserved. Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions
 are met:
@@ -4238,3 +4244,4 @@ int32_t silk_VAD_Init(                           /* O    Return value, 0 if succ
 
     return (ret);
 }
+#endif // DECODER_OPUS

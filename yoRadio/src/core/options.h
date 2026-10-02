@@ -133,6 +133,44 @@ The connection tables are located here https://github.com/e2002/yoradio#connecti
 // definition breaks every "#if ES8388_ENABLE" as a syntax error.
 //#define ES8388_ENABLE false
 
+/*       AUDIO DECODERS            */
+/* Each decoder is a self-contained codec in src/audioI2S/<name>_decoder/. Set one
+   to false and its source is excluded and every reference to it is compiled out,
+   so the codec can no longer be selected or played.
+
+   Turn one off only if you do not need that format. Internet radio is mostly
+   MP3 and AAC, so those are the two worth keeping in almost every case; the
+   rest exist for the occasional station that streams them.
+
+   Approximate flash cost of each, measured on this project (ESP32-A1S, 1.75MB
+   app partition), from .flash.text + .rodata:
+
+       MP3       ~31 KB     internet radio staple, keep
+       AAC       ~74 KB     aac/m4a streams, keep
+       FLAC      ~12 KB     lossless, uncommon on radio
+       OPUS      ~90 KB     opus/ogg; the largest single saving
+       VORBIS    ~71 KB     .ogg vorbis streams
+
+   Disabling OPUS and VORBIS together frees about 160 KB, which is roughly ten
+   times more than every other optional setting on this board combined.
+
+   Each is a boolean: true or false, never an empty definition. */
+#ifndef DECODER_MP3
+  #define DECODER_MP3      true
+#endif
+#ifndef DECODER_AAC
+  #define DECODER_AAC      true
+#endif
+#ifndef DECODER_FLAC
+  #define DECODER_FLAC     true
+#endif
+#ifndef DECODER_OPUS
+  #define DECODER_OPUS     true
+#endif
+#ifndef DECODER_VORBIS
+  #define DECODER_VORBIS   true
+#endif
+
 /*        SDCARD                  */
 #ifndef SDC_CS
   #define SDC_CS        255  // SDCARD CS pin

@@ -1,3 +1,9 @@
+/* Guarded by DECODER_FLAC: set it to false in myoptions.h (or options.h) and this
+   whole translation unit compiles away. See the AUDIO DECODERS block in
+   src/core/options.h for the cost of each decoder. */
+#include "../../core/options.h"
+#if DECODER_FLAC
+
 /*
  * flac_decoder.cpp
  * Java source code from https://www.nayuki.io/page/simple-flac-implementation
@@ -554,3 +560,4 @@ void restoreLinearPrediction(uint8_t ch, uint8_t shift) {
 }
 //----------------------------------------------------------------------------------------------------------------------
 
+#endif // DECODER_FLAC

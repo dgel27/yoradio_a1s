@@ -1,3 +1,9 @@
+/* Guarded by DECODER_VORBIS: set it to false in myoptions.h (or options.h) and this
+   whole translation unit compiles away. See the AUDIO DECODERS block in
+   src/core/options.h for the cost of each decoder. */
+#include "../../core/options.h"
+#if DECODER_VORBIS
+
 /********************************************************************
  *                                                                  *
  * THIS FILE IS PART OF THE OggVorbis SOFTWARE CODEC SOURCE CODE.   *
@@ -3291,3 +3297,4 @@ void mdct_unroll_lap(int32_t n0, int32_t n1, int32_t lW, int32_t W, int32_t *in,
     }
 }
 //---------------------------------------------------------------------------------------------------------------------
+#endif // DECODER_VORBIS

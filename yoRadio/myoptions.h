@@ -12,6 +12,27 @@
 /* ESP32-A1S with ES8388 DAC SETTINGS */
 #define ES8388_ENABLE true
 
+/* ======================= AUDIO DECODERS ================================ */
+/* Set one to false and that codec is left out of the build entirely. Keep MP3
+   and AAC: internet radio is almost entirely one of those two.
+
+   Measured flash cost of each on this board (1.75MB app partition):
+       MP3       ~31 KB      AAC ~43 KB      FLAC ~11 KB
+       OPUS      ~75 KB      VORBIS ~68 KB
+
+   Turning OPUS and VORBIS off frees about 144 KB, which is more than every
+   other optional setting here combined. Turning off all five leaves 231 KB
+   free, but the radio will then only play WAV and will reject most stations.
+
+   A decoder you switch off is not detected, so a station using it fails
+   instead of playing. All are true here: nothing is lost. */
+#define DECODER_MP3      true
+#define DECODER_AAC      true
+#define DECODER_FLAC     true
+#define DECODER_OPUS     true
+#define DECODER_VORBIS   true
+
+
 #define I2S_DOUT      26
 #define I2S_BCLK      27
 #define I2S_LRC       25

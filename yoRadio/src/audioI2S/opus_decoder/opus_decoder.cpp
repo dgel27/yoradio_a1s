@@ -1,3 +1,9 @@
+/* Guarded by DECODER_OPUS: set it to false in myoptions.h (or options.h) and this
+   whole translation unit compiles away. See the AUDIO DECODERS block in
+   src/core/options.h for the cost of each decoder. */
+#include "../../core/options.h"
+#if DECODER_OPUS
+
 /*
  * opus_decoder.cpp
  * based on Xiph.Org Foundation celt decoder
@@ -1074,3 +1080,4 @@ int32_t OPUS_specialIndexOf(uint8_t* base, const char* str, int32_t baselen, boo
     }
     return result;
 }
+#endif // DECODER_OPUS
