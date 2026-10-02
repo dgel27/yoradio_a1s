@@ -4758,33 +4758,32 @@ void Audio::forceMono(bool m) { // #100 mono option
     m_f_forceMono = m; // false stereo, true mono
 }
 //---------------------------------------------------------------------------------------------------------------------
+#ifndef ES8388_ENABLE
 void Audio::setBalance(int8_t bal){ // bal -16...16
     if(bal < -16) bal = -16;
     if(bal >  16) bal =  16;
     m_balance = bal;
 }
 //---------------------------------------------------------------------------------------------------------------------
-void Audio::setVolume(uint8_t vol) { // vol 22 steps, 0...21
+void Audio::setVolume(uint8_t vol) {
     if(vol > 254) vol = 254;
     m_vol = vol;
-/*    if(vol > 21) vol = 21;
-    m_vol = volumetable[vol];*/
 }
 //---------------------------------------------------------------------------------------------------------------------
-uint8_t Audio::getVolume() {
-    return m_vol;
-    /*for(uint8_t i = 0; i < 22; i++) {
-        if(volumetable[i] == m_vol) return i;
-    }
-    m_vol = 12; // if m_vol not found in table
-    return m_vol;*/
-}
-//---------------------------------------------------------------------------------------------------------------------
+#endif // !ES8388_ENABLE
 uint8_t Audio::getI2sPort() {
     return m_i2s_num;
 }
 //---------------------------------------------------------------------------------------------------------------------
 int32_t Audio::Gain(int16_t s[2]) {
+#ifdef ES8388_ENABLE
+    // Volume and L/R balance are both applied in the ES8388, so there is nothing
+    // left to do per sample and the float multiply is skipped entirely. The
+    // samples were already halved by playSample(), so passing them through
+    // unchanged reproduces the amplitude the software path produced at its
+    // pinned m_vol of 254 (254/256 = 0.992).
+    return ((int32_t)s[LEFTCHANNEL] << 16) | (s[RIGHTCHANNEL] & 0xffff);
+#else
     int32_t v[2];
     float step = (float)m_vol /254;
     uint8_t l = 0, r = 0;
@@ -4802,6 +4801,7 @@ int32_t Audio::Gain(int16_t s[2]) {
     v[RIGHTCHANNEL]= (s[RIGHTCHANNEL] * (m_vol - r)) >> 8;
 
     return (v[LEFTCHANNEL] << 16) | (v[RIGHTCHANNEL] & 0xffff);
+#endif
 }
 //---------------------------------------------------------------------------------------------------------------------
 uint32_t Audio::inBufferFilled() {

@@ -169,8 +169,15 @@ void Nextion::loop() {
             display.putRequest(NEWMODE, INFO);
           }
           if(strcmp(scanBuf, "eq") == 0) {
-            putcmd("t4.txt", config.store.balance, true);
-            putcmd("h0.val", config.store.balance+16);
+#ifdef ES8388_ENABLE
+            // The HMI shows the legacy -16..+16 balance; report the hardware
+            // value mapped back into that domain so the slider still lines up.
+            int8_t nBalance = player.getEs8388Balance();
+#else
+            int8_t nBalance = config.store.balance;
+#endif
+            putcmd("t4.txt", nBalance, true);
+            putcmd("h0.val", nBalance+16);
             putcmd("t5.txt", config.store.trebble, true);
             putcmd("h1.val", config.store.trebble+16);
             putcmd("t6.txt", config.store.middle, true);
@@ -233,8 +240,14 @@ void Nextion::loop() {
           player.sendCommand({PR_VOL, scanDigit});
         }
         if (sscanf(rxbuf, "balance=%d", &scanDigit) == 1){
+#ifdef ES8388_ENABLE
+          // ES8388 builds have no software balance; the HMI's -16..+16 slider
+          // drives the LOUT1 hardware trim through the same path the web UI uses.
+          player.setEs8388Balance((int8_t)scanDigit);
+#else
           config.setBalance((int8_t)scanDigit);
           player.setBalance(config.store.balance);
+#endif
           netserver.requestOnChange(BALANCE, 0);
         }
         if (sscanf(rxbuf, "treble=%d", &scanDigit) == 1){

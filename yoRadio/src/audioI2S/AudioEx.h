@@ -192,9 +192,13 @@ public:
     void loop();
     uint32_t stopSong();
     void forceMono(bool m);
+    #ifndef ES8388_ENABLE
+    /* Software volume and software L/R balance. ES8388 builds attenuate both
+       in the codec (DAC master register 26/27 and the LOUT1/ROUT1 analog
+       trims), so Gain() has no per-sample work left and these have no callers. */
     void setBalance(int8_t bal = 0);
     void setVolume(uint8_t vol);
-    uint8_t getVolume();
+    #endif
     uint8_t getI2sPort();
 
     uint32_t getAudioDataStartPos();
@@ -450,9 +454,6 @@ enum : int { CODEC_NONE = 0, CODEC_WAV = 1, CODEC_MP3 = 2, CODEC_AAC = 3, CODEC_
     typedef enum { LEFTCHANNEL=0, RIGHTCHANNEL=1 } SampleIndex;
     typedef enum { LOWSHELF = 0, PEAKEQ = 1, HIFGSHELF =2 } FilterType;
 
-    const uint8_t volumetable[22]={   0,  1,  2,  3,  4 , 6 , 8, 10, 12, 14, 17,
-                                     20, 23, 27, 30 ,34, 38, 43 ,48, 52, 58, 64}; //22 elements
-
     typedef struct _filter{
         float a0;
         float a1;
@@ -498,8 +499,10 @@ enum : int { CODEC_NONE = 0, CODEC_WAV = 1, CODEC_MP3 = 2, CODEC_AAC = 3, CODEC_
     int             m_readbytes = 0;                // bytes read
     uint32_t        m_metacount = 0;                // counts down bytes between metadata
     int             m_controlCounter = 0;           // Status within readID3data() and readWaveHeader()
+    #ifndef ES8388_ENABLE
     int8_t          m_balance = 0;                  // -16 (mute left) ... +16 (mute right)
     uint8_t         m_vol=64;                       // volume
+    #endif
     uint8_t         m_bitsPerSample = 16;           // bitsPerSample
     uint8_t         m_channels = 2;
     uint8_t         m_i2s_num = I2S_NUM_0;          // I2S_NUM_0 or I2S_NUM_1

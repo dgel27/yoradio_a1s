@@ -379,7 +379,16 @@ void NetServer::processQueue(){
       case BITRATE:       sprintf (wsbuf, "{\"bitrate\": %d, \"format\": \"%s\"}", config.station.bitrate, getFormat(config.configFmt)); break;
       case MODE:          sprintf (wsbuf, "{\"mode\": \"%s\"}", player.status() == PLAYING ? "playing" : "stopped"); telnet.info(); break;
       case EQUALIZER:     sprintf (wsbuf, "{\"bass\": %d, \"middle\": %d, \"trebble\": %d}", config.store.bass, config.store.middle, config.store.trebble); break;
-      case BALANCE:       sprintf (wsbuf, "{\"balance\": %d}", config.store.balance); break;
+      case BALANCE:
+#ifdef ES8388_ENABLE
+        // The hardware LOUT1 balance is what actually moves the speakers, so
+        // report that (in the legacy domain) rather than the software field,
+        // which ES8388 builds no longer use.
+        sprintf (wsbuf, "{\"balance\": %d}", player.getEs8388Balance());
+#else
+        sprintf (wsbuf, "{\"balance\": %d}", config.store.balance);
+#endif
+        break;
       case SDINIT:        sprintf (wsbuf, "{\"sdinit\": %d}", SDC_CS!=255); break;
       case GETPLAYERMODE: sprintf (wsbuf, "{\"playermode\": \"%s\"}", config.getMode()==PM_SDCARD?"modesd":"modeweb"); break;
       #ifdef USE_SD
@@ -865,8 +874,17 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
       }
       if (strcmp(cmd, "balance") == 0) {
         int8_t valb = atoi(val);
+        if (valb < -16) valb = -16;
+        if (valb >  16) valb =  16;
+#ifdef ES8388_ENABLE
+        // There is no software balance on ES8388 builds; this drives the LOUT1
+        // hardware balance instead, still in the legacy -16..+16 domain so the
+        // telnet, MQTT, Nextion and Home Assistant callers are unchanged.
+        player.setEs8388Balance(valb);
+#else
         player.setBalance(valb);
         config.setBalance(valb);
+#endif
         netserver.requestOnChange(BALANCE, 0);
         return;
       }
@@ -1112,8 +1130,14 @@ void handleHTTPArgs(AsyncWebServerRequest * request) {
     if (request->hasArg("ballance")) {
       AsyncWebParameter* p = request->getParam("ballance", request->method() == HTTP_POST);
       int b = atoi(p->value().c_str());
+      if (b < -16) b = -16;
+      if (b >  16) b =  16;
+#ifdef ES8388_ENABLE
+      player.setEs8388Balance((int8_t)b);
+#else
       player.setBalance(b);
       config.setBalance(b);
+#endif
       netserver.requestOnChange(BALANCE, 0);
       commandFound=true;
     }

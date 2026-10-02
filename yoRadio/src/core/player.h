@@ -69,7 +69,12 @@ class Player: public Audio {
     void toggle();
     void stepVol(bool up);
     void setVol(uint8_t volume);
+    #ifndef ES8388_ENABLE
+    /* userVolume (0..254) -> software gain (0..254), folding in the per-station
+       ovol trim. ES8388 builds attenuate in the codec instead, so this only
+       exists for the software volume path. */
     uint8_t volToI2S(uint8_t volume);
+    #endif
     void stopInfo();
     void setOutputPins(bool isPlaying);
     /* User-controlled speaker/amp mute, OR'd into setOutputPins() */
@@ -79,6 +84,20 @@ class Player: public Audio {
     /* Push the persisted ES8388 settings to the codec. */
     void applyEs8388Settings();
     void setEs8388Out(ES8388::ES8388_OUT out, uint8_t vol, int8_t balance);
+    /* L/R balance entry point for ES8388 builds. The legacy software balance
+       lived in Audio::Gain() and ran as a per-sample multiply over the decoded
+       stream; it is gone. balance= (telnet, MQTT, Nextion, Home Assistant and
+       the display) now drives the LOUT1 hardware balance instead, so the
+       control every integration already uses keeps working. es_bal1 stays the
+       single stored value, which is also what the main-page equalizer slider
+       writes, so there is one balance per output rather than two that stack.
+       balanceToEs8388()/es8388BalanceToLegacy() convert between the legacy
+       -16..+16 domain on the wire and the hardware -6..+6. */
+    void setEs8388Balance(int8_t legacyBalance);
+    int8_t balanceToEs8388(int8_t legacyBalance) const;
+    int8_t es8388BalanceToLegacy(int8_t hwBalance) const;
+    /* The stored LOUT1 balance, expressed in the legacy domain. */
+    int8_t getEs8388Balance() const;
     /* The main-page volume drives the DAC master register (26/27) rather than
        the software multiply, so the whole thing is one 0.5 dB-per-step
        attenuation and both analog outputs follow it. The per-output trims in
@@ -106,12 +125,6 @@ class Player: public Audio {
     #endif
     void setResumeFilePos(uint32_t pos) { _resumeFilePos = pos; }
   private:
-    #ifdef ES8388_ENABLE
-    /* Re-apply the soft-ramp rate. The codec's standby/wake sequence rewrites
-       the whole ramp register, so a wake has to restore it or later volume
-       changes inherit a different ramp. */
-    void applyEs8388SoftRamp();
-    #endif
     bool _spmute = false;
 #ifdef ES8388_ENABLE
     bool es_standby_wanted = false; // mirror of config.store.es8388.es_standby

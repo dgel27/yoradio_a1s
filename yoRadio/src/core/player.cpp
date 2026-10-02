@@ -79,16 +79,17 @@ void Player::init() {
   //-------- for Audio Kit 2.3 A247 with ES8388 codec
   #endif // ES8388_ENABLE
   
+#ifndef ES8388_ENABLE
+  // Software volume and software L/R balance both live in Audio::Gain(), which
+  // ES8388 builds do not use: the main-page volume is attenuated in the DAC's
+  // master register (applyEs8388Volume) and balance is the LOUT1 hardware trim
+  // (setEs8388Balance), so nothing should scale the samples before they get
+  // there. The stored LOUT1 balance has already been pushed by
+  // applyEs8388Settings() above.
   setBalance(config.store.balance);
-  setTone(config.store.bass, config.store.middle, config.store.trebble);
-#ifdef ES8388_ENABLE
-  // Software volume is pinned to unity: the main-page volume is attenuated in
-  // the DAC's master register instead (see applyEs8388Volume), so nothing
-  // should scale the samples before they get there.
-  setVolume(254);
-#else
   setVolume(0);
 #endif
+  setTone(config.store.bass, config.store.middle, config.store.trebble);
   _spmute = config.store.spmute != 0; // restore user speaker-mute
   _status = STOPPED;
   _volTimer=false;
@@ -285,12 +286,6 @@ void Player::stepVolumeBy(int steps)
     setVol(v);
 }
 
-void Player::applyEs8388SoftRamp()
-{
-    uint8_t rate = config.store.es8388.es_ramp_rate > 3 ? 3 : config.store.es8388.es_ramp_rate;
-    es.soft_ramp(config.store.es8388.es_soft_ramp != 0, rate);
-}
-
 /* The main-page volume now attenuates in the DAC instead of in software.
    The soft ramp is forced on here regardless of the stored preference: a step
    on the master register is a real output discontinuity without it, and with it
@@ -301,6 +296,44 @@ void Player::applyEs8388Volume(uint8_t userVolume)
     uint8_t rate = config.store.es8388.es_ramp_rate > 3 ? 3 : config.store.es8388.es_ramp_rate;
     es.soft_ramp(true, rate);
     es.volume(ES8388::ES_MAIN, volumeToEs8388(userVolume));
+}
+
+/* Legacy balance domain (-16..+16) -> hardware LOUT1 balance (-6..+6).
+   Both domains are "positive favours left", so this is a plain rescale with no
+   sign flip. Integer division truncates towards zero, which keeps the mapping
+   symmetric around centre. */
+int8_t Player::balanceToEs8388(int8_t legacyBalance) const
+{
+    int b = (int)legacyBalance * 6 / 16;
+    if (b > 6) b = 6;
+    if (b < -6) b = -6;
+    return (int8_t)b;
+}
+
+/* Inverse of balanceToEs8388(), so a client reading the balance back sees the
+   -16..+16 domain it has always used rather than the hardware's -6..+6. */
+int8_t Player::es8388BalanceToLegacy(int8_t hwBalance) const
+{
+    int b = (int)hwBalance * 16 / 6;
+    if (b > 16) b = 16;
+    if (b < -16) b = -16;
+    return (int8_t)b;
+}
+
+int8_t Player::getEs8388Balance() const
+{
+    return es8388BalanceToLegacy(config.store.es8388.es_bal1);
+}
+
+/* One balance per output. es_bal1 is the stored value, shared with the
+   main-page equalizer slider and the settings page, so balance= and the UI
+   move the same register instead of the two stacking. */
+void Player::setEs8388Balance(int8_t legacyBalance)
+{
+    es8388_t &e = config.store.es8388;
+    int8_t hw = balanceToEs8388(legacyBalance);
+    config.saveValue(&e.es_bal1, hw);
+    setEs8388Out(ES8388::ES_OUT1, e.es_vol1, hw);
 }
 
 /* Enable/disable automatic standby. Turning it off wakes the codec at once if
@@ -394,7 +427,7 @@ void Player::loop() {
 #ifdef ES8388_ENABLE
         applyEs8388Volume(requestP.payload);
 #else
-        Audio::setVolume(volToI2S(requestP.payload));
+        setVolume(volToI2S(requestP.payload));
 #endif
         break;
       }
@@ -612,12 +645,14 @@ void Player::stepVol(bool up) {
 #endif
 }
 
+#ifndef ES8388_ENABLE
 uint8_t Player::volToI2S(uint8_t volume) {
   int vol = map(volume, 0, 254 - config.station.ovol * 3 , 0, 254);
   if (vol > 254) vol = 254;
   if (vol < 0) vol = 0;
   return vol;
 }
+#endif // !ES8388_ENABLE
 
 void Player::_loadVol(uint8_t volume) {
 #ifdef ES8388_ENABLE
