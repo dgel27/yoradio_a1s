@@ -2,7 +2,7 @@
 #if DSP_MODEL==DSP_SH1106 || DSP_MODEL==DSP_SH1107
 
 #include "displaySH1106.h"
-#include <Wire.h>
+#include "../core/i2cbuses.h"
 #include "../core/player.h"
 #include "../core/config.h"
 #include "../core/network.h"
@@ -30,7 +30,7 @@ const unsigned char logo [] PROGMEM=
     0x1f, 0xff, 0xe0, 0x0f, 0xff, 0xe0, 0x03, 0xff, 0xc0, 0x00, 0xfe, 0x00
 };
 
-TwoWire I2CSH1106 = TwoWire(0);
+TwoWire &I2CSH1106 = i2cPeripheralBus();
 #if DSP_MODEL==DSP_SH1106
 DspCore::DspCore(): Adafruit_SH1106G(128, 64, &I2CSH1106, -1, I2CFREQ_HZ) {
 
@@ -44,7 +44,7 @@ DspCore::DspCore(): Adafruit_SH1107(64, 128, &I2CSH1106, -1) {
 #include "tools/utf8RusGFX.h"
 
 void DspCore::initDisplay() {
-  I2CSH1106.begin(I2C_SDA, I2C_SCL);
+
   if (!begin(SCREEN_ADDRESS, true)) {
     Serial.println(F("SH110X allocation failed"));
     for (;;); // Don't proceed, loop forever

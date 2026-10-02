@@ -2,7 +2,7 @@
 #if DSP_MODEL==DSP_SSD1327
 
 #include "displaySSD1327.h"
-#include <Wire.h>
+#include "../core/i2cbuses.h"
 #include "fonts/bootlogo40.h"
 #include "../core/player.h"
 #include "../core/config.h"
@@ -16,7 +16,7 @@
   #define I2CFREQ_HZ   6000000UL
 #endif
 
-TwoWire tw = TwoWire(0);
+TwoWire &tw = i2cPeripheralBus();
 
 DspCore::DspCore(): Adafruit_SSD1327(128, 128, &tw, I2C_RST/*, I2CFREQ_HZ*/) {}
 
@@ -26,7 +26,7 @@ DspCore::DspCore(): Adafruit_SSD1327(128, 128, &tw, I2C_RST/*, I2CFREQ_HZ*/) {}
 #define CLR_ITEM2    0x8
 #define CLR_ITEM3    0x5
 void DspCore::initDisplay() {
-  tw.begin(I2C_SDA, I2C_SCL);
+
   if (!begin(SCREEN_ADDRESS)) {
     Serial.println(F("SSD1327 allocation failed"));
     for (;;);

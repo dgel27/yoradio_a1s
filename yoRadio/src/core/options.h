@@ -98,14 +98,43 @@ The connection tables are located here https://github.com/e2002/yoradio#connecti
 #endif
 
 /*        OLED I2C DISPLAY        */
+/* 255 = not configured. These used to default to 21/22, which is right for a
+   generic ESP32 but wrong on several boards: on the ESP32-A1S 21 is the
+   amplifier mute pin (MUTE_PIN) and 22 drives LED4, so an I2C display added
+   without setting these collided with the amp. Leave them at 255 and the
+   display will share the ES8388 bus instead - see src/core/i2cbuses.h - or set
+   them to a free pair. */
 #ifndef I2C_SDA
-  #define I2C_SDA 21
+  #define I2C_SDA 255
 #endif
 #ifndef I2C_SCL
-  #define I2C_SCL 22
+  #define I2C_SCL 255
 #endif
 #ifndef I2C_RST
   #define I2C_RST -1
+#endif
+
+/*        PERIPHERAL I2C BUS       */
+/* A second I2C bus (the ESP32's I2C1, exposed by Arduino as Wire1) for a
+   display, sensors or an RTC, kept off the ES8388 bus entirely. 255 = no second
+   bus; peripherals fall back to the primary bus and nothing changes.
+
+   To use one, set both to free GPIOs. They cannot be chosen at runtime: the
+   Arduino core allows a bus's pins to be set exactly once, so these are build
+   time by necessity. Any two output-capable GPIOs work.
+
+   Pins that cannot be used on the ESP32-A1S:
+     0, 25, 26, 27, 32, 33, 35  wired inside the module to its own ES8388
+     34, 36, 39                 input only, no output driver, so not valid SDA/SCL
+     1, 3                      the USB serial console used for flashing
+     2                         strapping pin, sampled at reset
+   GPIO 12/13/14/15 and 5/18/19/23 need a 0 ohm resistor removing first; see
+   datasheets/ESP32-A1S/ESP32-A1S-GPIO-and-jumper-resistors.md. */
+#ifndef I2C2_SDA
+  #define I2C2_SDA 255
+#endif
+#ifndef I2C2_SCL
+  #define I2C2_SCL 255
 #endif
 
 /*        VS1053                  */
@@ -264,19 +293,19 @@ The connection tables are located here https://github.com/e2002/yoradio#connecti
 #endif
 
 #ifndef TS_CS
-  #define TS_CS                 13
+  #define TS_CS                 255
 #endif
 #ifndef TS_SDA
-  #define TS_SDA                33
+  #define TS_SDA                255
 #endif
 #ifndef TS_SCL
-  #define TS_SCL                32
+  #define TS_SCL                255
 #endif
 #ifndef TS_INT
-  #define TS_INT                21
+  #define TS_INT                255
 #endif
 #ifndef TS_RST
-  #define TS_RST                25
+  #define TS_RST                255
 #endif
 
 #ifndef TS_HSPI

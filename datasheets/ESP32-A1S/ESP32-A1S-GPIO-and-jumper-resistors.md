@@ -222,7 +222,84 @@ disable path or accept the noise burst.
 
 ---
 
-## 6. Verify before you solder
+## 6. Using the free GPIOs for a second I2C bus
+
+The module's ES8388 is on **I2C0** (`Wire`, hard-wired — the Arduino core cannot
+re-point it). The ESP32 has a second controller, **I2C1**, which is free for a
+display, sensors or an RTC.
+
+Set the bus in `myoptions.h`; no code change is needed:
+
+```c
+#define I2C2_SDA 22
+#define I2C2_SCL 23
+```
+
+Left at `255`/`255` (the default) no second bus is opened and peripherals fall
+back to the ES8388 bus, which is the previous behaviour.
+
+**These are build-time only.** The Arduino core lets a bus's pins be set
+exactly once: a second `begin()` on a running bus returns `true` and silently
+keeps the old pins, and `setPins()` on a running bus returns `false`. So the
+pins cannot be decided at runtime — pick them, then rebuild.
+
+### Candidate pairs
+
+Every one needs at least one 0 Ω removed, since each of these pins currently
+drives an onboard circuit.
+
+| SDA + SCL | Remove | Leaves free | Note |
+|---|---|---|---|
+| **22 + 23** | R14, R68 | 5, 18, 19 | best default — see below |
+| 22 + 13 | R14, R66 | 5, 18, 19, 23 | 13 is the most shared pin (DIP switch) |
+| 5 + 18 | R70, R69 | 19, 23, 22 | |
+| 18 + 19 | R69, R67 | 5, 23, 22 | |
+| 23 + 19 | R68, R67 | 5, 18, 22 | |
+| 4 + 22 | R28, R14 | 5, 18, 19, 23 | 4 has the least on-board attachment |
+
+**22 + 23 is the best default.** GPIO22 is the Arduino-default SCL and has the
+lightest on-board load, and GPIO23 is one of the four VSPI pins — so the pair
+leaves **5, 18, 19** intact, which is exactly the VSPI group
+(SCK=18, MISO=19, MOSI=23, SS=5) for an SPI display if you ever want one.
+
+### Pins that cannot be used for I2C
+
+| GPIO | Why |
+|---|---|
+| 0, 25, 26, 27, 32, 33, 35 | wired inside the module to its own ES8388 |
+| 34, 36, 39 | input only, no output driver — invalid as SDA **or** SCL |
+| 1, 3 | the USB serial console used for `pio run -t upload` and the monitor |
+| 2 | strapping pin, sampled at reset |
+| 12, 14, 15 | the encoder in this build (and the JTAG pins) |
+| 21 | `MUTE_PIN`, the amplifier enable |
+
+### Electrical notes
+
+- **Fit external pull-ups** (2.2 k–10 k to 3V3) on SDA and SCL. The ESP32's
+  internal ones are always enabled but are far too weak (~45 kΩ) for 400 kHz,
+  and there is no way to switch them off.
+- The bus is initialised at 100 kHz, the core's default when no frequency is
+  given. Raise it only if your peripheral and wiring allow.
+- Only one device per address per bus. The ES8388 is at `0x10`; typical
+  peripherals are elsewhere (OLED `0x3C`/`0x3D`, DS3231/DS1307 `0x68`, GT911
+  `0x5D`/`0x14`), so there is no conflict on the primary bus if you choose to
+  share it.
+
+### What already uses this
+
+`src/core/i2cbuses.h` owns the bus. `i2cPeripheralBus()` returns I2C1 when
+configured, otherwise `Wire`. It is the **only** place a peripheral bus is ever
+begun, which is what keeps the set-once rule from being broken by a driver that
+happens to initialise first.
+
+Wired to it: the SSD1306, SH1106, SSD1305 and SSD1327 display drivers, and
+`rtcsupport.cpp`. Not yet converted: `LiquidCrystal_I2C` and the GT911 touch
+driver, both of which use the global `Wire` directly and would need a
+`TwoWire*` member added.
+
+---
+
+## 7. Verify before you solder
 
 Designators in the *schematic* rows come from reading the V2.2 carrier PDF. Two
 known caveats:

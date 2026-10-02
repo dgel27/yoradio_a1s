@@ -1,14 +1,13 @@
 #include "rtcsupport.h"
 
 #if RTCSUPPORTED
-#include <Wire.h>
+#include "i2cbuses.h"
 
-TwoWire RTCWire = TwoWire(0);
+TwoWire &RTCWire = i2cPeripheralBus();
   
 RTC rtc;
 
 bool RTC::init(){
-	RTCWire.begin(RTC_SDA, RTC_SCL);
 	return begin(&RTCWire);
 }
 

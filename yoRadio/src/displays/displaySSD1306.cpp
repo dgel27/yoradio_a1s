@@ -2,7 +2,7 @@
 #if DSP_MODEL==DSP_SSD1306 || DSP_MODEL==DSP_SSD1306x32
 
 #include "displaySSD1306.h"
-#include <Wire.h>
+#include "../core/i2cbuses.h"
 #include "../core/player.h"
 #include "../core/config.h"
 #include "../core/network.h"
@@ -33,14 +33,14 @@ const unsigned char logo [] PROGMEM=
   #define I2CFREQ_HZ   4000000UL
 #endif
 
-TwoWire I2CSSD1306 = TwoWire(0);
+TwoWire &I2CSSD1306 = i2cPeripheralBus();
 
 DspCore::DspCore(): Adafruit_SSD1306(128, ((DSP_MODEL==DSP_SSD1306)?64:32), &I2CSSD1306, I2C_RST, I2CFREQ_HZ) { }
 
 #include "tools/utf8RusGFX.h"
 
 void DspCore::initDisplay() {
-  I2CSSD1306.begin(I2C_SDA, I2C_SCL);
+
   if (!begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));
     for (;;); // Don't proceed, loop forever

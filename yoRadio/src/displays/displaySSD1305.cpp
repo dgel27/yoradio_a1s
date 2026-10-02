@@ -35,8 +35,8 @@ const unsigned char logo [] PROGMEM=
     DspCore::DspCore(): Adafruit_SSD1305(128, 64, &SPI, TFT_DC, TFT_RST, TFT_CS, DEF_SPI_FREQ) {}
   #endif
 #else
-#include <Wire.h>
-TwoWire I2CSSD1305 = TwoWire(0);
+#include "../core/i2cbuses.h"
+TwoWire &I2CSSD1305 = i2cPeripheralBus();
 DspCore::DspCore(): Adafruit_SSD1305(128, 64, &I2CSSD1305, -1){
 
 }
@@ -46,7 +46,7 @@ DspCore::DspCore(): Adafruit_SSD1305(128, 64, &I2CSSD1305, -1){
 
 void DspCore::initDisplay() {
 #if DSP_MODEL==DSP_SSD1305I2C
-  I2CSSD1305.begin(I2C_SDA, I2C_SCL);
+
 #endif
   if (!begin(SCREEN_ADDRESS)) {
     Serial.println(F("SSD1305 allocation failed"));
