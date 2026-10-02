@@ -120,27 +120,27 @@ Confidence column:
 - **schematic** — read from `esp32-audio-kit_v2.2_sch.pdf`; verify before soldering
 - **community** — from a third-party porting write-up, corroborated by the schematic
 
-| GPIO | Resistor | Gates | To free the pin | Confidence |
-|---|---|---|---|---|
-| 5 | **R70** (0 Ω) | KEY6 button + debounce cap | remove R70 | community + schematic |
-| 13 | **R66** (0 Ω) | KEY2 button + debounce cap | remove R66 | community + schematic |
-| 18 | **R69** (0 Ω) | KEY5 button + debounce cap | remove R69 | community + schematic |
-| 19 | **R67** (0 Ω) | KEY3 button + debounce cap (also LED5) | remove R67 | community + schematic |
-| 23 | **R68** (0 Ω) | KEY4 button + debounce cap | remove R68 | community + schematic |
-| 36 | **R53** | `KEY_AD` resistor ladder (KEY1–KEY6 as one analog ADC channel) | remove R53 | schematic |
-| 21 | **R46** | speaker-amp `CTRL` / ShutDown — this project's `MUTE_PIN` | remove R46 | schematic |
-| 39 | **R37** | SD `DATA2` | remove R37 | schematic |
-| 39 | **R36** | headphone `HP_Detect` | remove R36 | schematic |
-| 22 | **R14** | LED4 indicator | remove R14 | schematic |
-| 19 | **R76** | LED5 indicator | remove R76 | schematic |
-| 34 | **R29** | SD `CLK` | remove R29 | schematic |
-| 34 | **R18** | 3V3 pull-up on IO34 | remove R18 | schematic |
-| 14 | **R26** | SD `CLK` (shared net with R29) | remove R26 | schematic |
-| 2 | **R27** | SD `DATA0` | remove R27 | schematic |
-| 4 | **R28** | SD `DATA1` | remove R28 | schematic |
-| 12 | **R23** | SD `DATA2` net / pull-down | remove R23 | schematic |
-| 15 | **R25** | SD `CMD` | remove R25 | schematic |
-| 13 | **R58** | SD `DATA3` | remove R58 | schematic |
+| GPIO | Resistor | Value | Gates | To free the pin | Confidence |
+|---|---|---|---|---|---|
+| 5 | **R70** | **0 Ω** | KEY6 button + debounce cap | remove R70 | community + schematic |
+| 13 | **R66** | **0 Ω** | KEY2 button + debounce cap | remove R66 | community + schematic |
+| 18 | **R69** | **0 Ω** | KEY5 button + debounce cap | remove R69 | community + schematic |
+| 19 | **R67** | **0 Ω** | KEY3 button + debounce cap (also LED5) | remove R67 | community + schematic |
+| 23 | **R68** | **0 Ω** | KEY4 button + debounce cap | remove R68 | community + schematic |
+| 36 | **R53** | not printed | `KEY_AD` resistor ladder (KEY1–KEY6 as one analog ADC channel) | remove R53 | schematic |
+| 21 | **R46** | not printed | speaker-amp `CTRL` / ShutDown — this project's `MUTE_PIN` | remove R46 | schematic |
+| 39 | **R37** | not printed | SD `DATA2` | remove R37 | schematic |
+| 39 | **R36** | not printed | headphone `HP_Detect` | remove R36 | schematic |
+| 22 | **R14** | not printed | LED4 indicator | remove R14 | schematic |
+| 19 | **R76** | not printed | LED5 indicator | remove R76 | schematic |
+| 34 | **R29** | not printed | SD `CLK` | remove R29 | schematic |
+| 34 | **R18** | not printed | 3V3 pull-up on IO34 | remove R18 | schematic |
+| 14 | **R26** | not printed | SD `CLK` (shared net with R29) | remove R26 | schematic |
+| 2 | **R27** | not printed | SD `DATA0` | remove R27 | schematic |
+| 4 | **R28** | not printed | SD `DATA1` | remove R28 | schematic |
+| 12 | **R23** | not printed | SD `DATA2` net / pull-down | remove R23 | schematic |
+| 15 | **R25** | not printed | SD `CMD` | remove R25 | schematic |
+| 13 | **R58** | not printed | SD `DATA3` | remove R58 | schematic |
 
 R67–R70 and R66 are explicitly called out in a community porting note as *"all
 0 Ohms … unsoldered R66, 67, 68, 69, 70 to free these GPIOs from the
@@ -169,6 +169,72 @@ independently.** `KEY_AD` is on GPIO 36, which is input-only.
 
 If you remove R53 you lose all six keys but free GPIO 36 — except it still has
 no output driver, so it is only useful as an ADC input.
+
+### Key circuit component values
+
+> **The carrier schematic prints no component values at all.** Every designator
+> is present, every value is absent — the Altium PDF export carries reference
+> designators without the Comment/Value fields. So the table below says
+> `not printed` wherever the value genuinely cannot be established from the
+> documentation in this folder. Do not read a blank as "0 Ω" or "100 k".
+
+| Ref | Function | Value | Source |
+|---|---|---|---|
+| **R66** | 0 Ω link, IO13 ↔ KEY2 | **0 Ω** | porting write-up: "all 0 Ohms" |
+| **R67** | 0 Ω link, IO19 ↔ KEY3 | **0 Ω** | as above |
+| **R68** | 0 Ω link, IO23 ↔ KEY4 | **0 Ω** | as above |
+| **R69** | 0 Ω link, IO18 ↔ KEY5 | **0 Ω** | as above |
+| **R70** | 0 Ω link, IO5 ↔ KEY6 | **0 Ω** | as above |
+| **R53** | IO36 → `KEY_AD` | not printed | schematic |
+| **R52**, **R54** | `KEY_AD` bias network with C41 | not printed | schematic |
+| **R55–R59** | ladder, VDD3V3 side | not printed | schematic |
+| **R60–R64** | ladder, key side | not printed | schematic |
+| **R36** | HP-detect pull-up to VDD3V3 | not printed | schematic |
+
+Ladder topology, from the schematic: `VDD3V3` biases `KEY_AD` through R52/R54
+with C41 filtering; R55–R59 form the divider chain down to GND; each key switch
+pulls `KEY_AD` to a distinct tap through R60–R64, so the six keys produce six
+different ADC voltages on GPIO 36. Removing R66–R70 disconnects the GPIO from
+its key **and its debounce capacitor** — that is the entire reason a 0 Ω link is
+there at all.
+
+The only resistance value printed anywhere on this schematic
+(`Vo=(Ra/Rb+1)*0.6V=(510k/110k+1)*0.6V=3.38V`) belongs to **R7 beside JP1**,
+the USB-serial 5 V→3.3 V level divider. It is not part of the key circuit and is
+not a key-ladder value.
+
+#### If you rebuild the ladder yourself
+
+The tap voltages are set by R61–R64, so their values are yours to choose rather
+than copy:
+
+- Keep the ladder in the tens of kΩ range. Too large and the ADC input
+  impedance of input-only GPIO 36 distorts the reading; too small and you burn
+  current for as long as a key is held.
+- Work each divider backwards from the voltage you want: for a tap with `Ra` to
+  VDD3V3 and `Rb` to GND, `V = VDD3V3 × Rb / (Ra + Rb)`. Leave **≥ ~0.15 V**
+  between adjacent taps so ADC error and noise cannot make two keys ambiguous.
+- KEY1 needs no divider — it reads as a direct low, which is why it still works
+  with R56/R61, R57/R62, R58/R63 and R59/R64 unpopulated.
+
+**The fitted values are not documented anywhere in this repository.** Measure
+them in circuit, or pick your own with the formula above.
+
+### ⚠ yoRadio cannot read these keys
+
+Being blunt about this: the change is **hardware-only**. `src/core/controls.cpp`
+reads buttons as discrete digital pins through OneButton, and there is no
+`analogRead` of `KEY_AD` anywhere in the tree — the only `analogRead` calls are
+the backlight and a commented-out seed line.
+
+So removing R66–R70 buys you five free GPIOs **and five dead keys**. Making the
+ladder work in firmware means adding ADC key scanning: sample GPIO 36, compare
+against thresholds, map to button ids. That is a feature to write, not a flag to
+set — no option in `options.h` enables it.
+
+Remove R66–R70 if you want the pins for an encoder, an I2C bus or SPI, and
+accept the keys going dead. Keep them fitted if you would rather have working
+keys and find the pins elsewhere.
 
 ---
 
@@ -219,6 +285,35 @@ Leaving the pull-down off means a loud pop every restart.
 If you want to free GPIO 21 for something else, remove **R46** — but you also
 give up the clean-reboot mute, and you should then fit a real amplifier
 disable path or accept the noise burst.
+
+### Freeing the five key GPIOs (remove R66–R70)
+
+Removing those five 0 Ω links hands you **GPIO 5, 13, 18, 19 and 23**, which is
+the whole VSPI group plus KEY2's pin:
+
+| GPIO | Module pin | Free for |
+|---|---|---|
+| 5 | 29 | VSPI SS |
+| 18 | 30 | VSPI SCK |
+| 19 | 32 | VSPI MISO |
+| 23 | 31 | VSPI MOSI |
+| 13 | 9 | SD DATA3 / JTAG MTCK / KEY2 — still shared, see §4 |
+
+Two consequences:
+
+- **The keys stop working.** They are only reachable through the `KEY_AD`
+  ladder on GPIO 36, and yoRadio has no ADC key support at all — see the note
+  above. This is not reversible in software.
+- **GPIO 13 stays shared.** It is a three-way DIP (KEY2 / SD DATA3 / JTAG MTCK),
+  so removing R66 frees it from the key but the switch still decides its other
+  two functions.
+
+With those five free, the recommended peripheral I2C pair changes: **22 + 13**
+needs R14 *and* R66, whereas **22 + 23** now needs only R14. The VSPI display
+option stays open either way since 5/18/19/23 are now all yours.
+
+Note that a second encoder is also possible on this board — `ENC_BTNL`/`ENC_BTNR`
+support a second one — and 5/18/19/23 are exactly the pins it would want.
 
 ---
 
