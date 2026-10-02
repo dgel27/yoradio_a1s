@@ -127,7 +127,11 @@ The connection tables are located here https://github.com/e2002/yoradio#connecti
 #endif
 
 /*         ES8388 DAC             */
-//define ES8388_ENABLE
+// ES8388_ENABLE is a boolean, tested with #if / #if ! ... everywhere. Define it
+// as true or false; "false" disables the codec, its EEPROM settings, the
+// /esvol* commands and its web UI group. Do not leave it empty: an empty
+// definition breaks every "#if ES8388_ENABLE" as a syntax error.
+//#define ES8388_ENABLE false
 
 /*        SDCARD                  */
 #ifndef SDC_CS

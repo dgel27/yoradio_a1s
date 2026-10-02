@@ -168,7 +168,7 @@ void encodersLoop(yoEncoder *enc, bool first){
 #   if defined(DUMMYDISPLAY) && !defined(USE_NEXTION)
     first = first?(first && encBtnState):(!encBtnState);
     if(first){
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
       // Step in master-register space: the encoder delta is a detent count, and
       // one detent must always move at least one 0.5 dB step rather than
       // round to the same register and look dead.
@@ -460,7 +460,7 @@ void controlsEvent(bool toRight, int8_t volDelta) {
       display.putRequest(NEWMODE, VOL);
     #endif
     if(volDelta!=0){
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
       player.stepVolumeBy(volDelta);
 #else
       int nv = config.store.volume+volDelta;

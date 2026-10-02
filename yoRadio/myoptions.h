@@ -54,15 +54,17 @@
    0..192 where 192 = 0dB (unity) and 0 = -96dB, 0.5dB per step.
    192 (0dB) is safe here: the software chain can never exceed the decoder's
    own output. Audio halves each sample (Audio.cpp, "half Vin so we can boost up
-   to 6dB in filters"), the biquad gains are clamped to +6dB max, and Gain() at
-   m_vol 254 is ~unity, so the worst case nets to 0dB. This is a fixed
-   headroom/trim setting; the user's volume slider is the software path
-   (index.html "volume" -> config.store.volume -> Audio::setVolume). */
+   to 6dB in filters") and the biquad gains are clamped to +6dB max, so the
+   worst case nets to 0dB. For ES8388 builds this register is driven by the
+   main-page slider, not by this value: the slider is the DAC master register
+   (index.html "volume" -> config.store.volume -> Player::applyEs8388Volume).
+   This define only seeds config.store.es8388.es_master_vol, a field nothing
+   reads, kept solely so sizeof(config_t) and the EEPROM layout stay stable. */
 #define ES8388_MAIN_VOLUME     192     // 0dB, unity
 /* Analog output volume. Registers 46/47 (LOUT1/ROUT1) and 48/49 (LOUT2/ROUT2).
    0..33 where 30 = 0dB and 33 = +4.5dB, 1.5dB per step, 0 = -45dB.
-   On the ESP32-A1S: OUT1 = headphone amp (HPOUTL/R), OUT2 = on-board
-   speaker amp (SPOLP/N). Values above 33 are clamped. */
+   On the ESP32-A1S: OUT1 = on-board speaker amp (SPOLP/N), OUT2 = headphone
+   amp (HPOUTL/R). Values above 33 are clamped. */
 #define ES8388_OUT1_VOLUME     30      // 0dB into the external amp
 #define ES8388_OUT2_VOLUME     30      // 0dB into the speaker amp
 

@@ -16,8 +16,8 @@
  *      main volume and 30 for each analog output.
  *
  *   3. Its OUT1/OUT2 comments contradict each other ("works for amp" vs
- *      "HeadPhones?"). On this board OUT1 is the headphone amp (HPOUTL/R) and
- *      OUT2 is the on-board speaker amp (SPOLP/N).
+ *      "HeadPhones?"). On this board OUT1 is the on-board speaker amp (SPOLP/N)
+ *      and OUT2 is the headphone amp (HPOUTL/R).
  *
  * It also defines ES8388_ENABLE with no value, which does not compile in this
  * fork - see the note in myoptions-a1s.h.

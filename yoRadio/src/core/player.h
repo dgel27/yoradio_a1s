@@ -8,7 +8,7 @@
   #include "../audioVS1053/audioVS1053Ex.h"
 #endif
 
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
   #include "../audioES8388/ES8388.h"
 #endif
 
@@ -69,7 +69,7 @@ class Player: public Audio {
     void toggle();
     void stepVol(bool up);
     void setVol(uint8_t volume);
-    #ifndef ES8388_ENABLE
+    #if !ES8388_ENABLE
     /* userVolume (0..254) -> software gain (0..254), folding in the per-station
        ovol trim. ES8388 builds attenuate in the codec instead, so this only
        exists for the software volume path. */
@@ -80,7 +80,7 @@ class Player: public Audio {
     /* User-controlled speaker/amp mute, OR'd into setOutputPins() */
     void setSpeakerMute(bool muted);
     bool speakerMute() const { return _spmute; }
-    #ifdef ES8388_ENABLE
+    #if ES8388_ENABLE
     /* Push the persisted ES8388 settings to the codec. */
     void applyEs8388Settings();
     void setEs8388Out(ES8388::ES8388_OUT out, uint8_t vol, int8_t balance);
@@ -118,15 +118,19 @@ class Player: public Audio {
     void stepVolumeBy(int steps);
     /* Park/wake the codec with playback; also flips the persisted flag. */
     void setEs8388Standby(bool on);
+    #endif
     /* Mute the amp and silence the codec ahead of a restart. Call this
        immediately before ESP.restart() so the speaker is shut down before the
-       CPU stops, instead of floating until the next boot drives the pin. */
+       CPU stops, instead of floating until the next boot drives the pin.
+       Deliberately outside the ES8388 guard: the MUTE_PIN half is board wiring
+       and is needed whether or not this build has an ES8388, and a dozen call
+       sites (config.reset, the netserver reboot paths, telnet, MQTT) are not
+       conditional on the codec. */
     static void prepareForRestart();
-    #endif
     void setResumeFilePos(uint32_t pos) { _resumeFilePos = pos; }
   private:
     bool _spmute = false;
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
     bool es_standby_wanted = false; // mirror of config.store.es8388.es_standby
     bool es_sleeping = false;       // true while the codec is in standby
 #endif

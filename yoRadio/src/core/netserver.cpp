@@ -21,7 +21,7 @@
   #define NSQ_SEND_DELAY       (TickType_t)100  //portMAX_DELAY?
 #endif
 
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
   #include "../audioES8388/ES8388.h"
   extern ES8388 es; // single shared instance, owned by player.cpp
 #endif
@@ -277,7 +277,9 @@ void NetServer::processQueue(){
                                                                 act += F("\"group_controls\",");
             if (ENC_BTNL != 255 || ENC2_BTNL != 255 || dbgact)  act += F("\"group_encoder\",");
             if (IR_PIN != 255 || dbgact)                        act += F("\"group_ir\",");
-            if (ES8388_ENABLE || dbgact)                        act += F("\"group_es8388\",");
+          #if ES8388_ENABLE
+            act += F("\"group_es8388\",");
+          #endif
             // MQTT_ROOT_TOPIC is a string literal, so "if (MQTT_ROOT_TOPIC)"
             // would be a pointer test and always true. MQTT is compiled in
             // whenever the macro exists, and the settings page needs this
@@ -352,7 +354,7 @@ void NetServer::processQueue(){
                                   break;
       case DSPON:         sprintf (wsbuf, "{\"dspontrue\":%d}", 1); break;
       case GETES8388:
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
         {
           es8388_t &e = config.store.es8388;
           // esmv is the MAIN-PAGE volume (0..254), not the old es_master_vol:
@@ -389,7 +391,7 @@ void NetServer::processQueue(){
       case MODE:          sprintf (wsbuf, "{\"mode\": \"%s\"}", player.status() == PLAYING ? "playing" : "stopped"); telnet.info(); break;
       case EQUALIZER:     sprintf (wsbuf, "{\"bass\": %d, \"middle\": %d, \"trebble\": %d}", config.store.bass, config.store.middle, config.store.trebble); break;
       case BALANCE:
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
         // The hardware LOUT1 balance is what actually moves the speakers, so
         // report that (in the legacy domain) rather than the software field,
         // which ES8388 builds no longer use.
@@ -636,15 +638,15 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
       }
 
 
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
 // Names from WEB. These must match the name= attributes in settings.html
 // (sliders) and the id= of the hpmutesp checkbox. Each handler persists to
 // config.store.es8388 so the value survives a reboot.
-//         - esmastervol  digital volume, both outputs (0-192)
 //         - esstereo    stereo widening strength 0-7 (an effect, not a tone EQ)
-//         - esvol1      LOUT1/ROUT1 (headphone amp) analog volume 0-33
-//         - esch1bal    LOUT1/ROUT1 L/R balance -6..+6
-//         - esvol2      LOUT2/ROUT2 (on-board speaker amp) analog volume 0-33
+//         - esvol1      LOUT1/ROUT1 (on-board speaker amp) analog volume 0-33
+//         - esch1bal    LOUT1/ROUT1 L/R balance -6..+6; this is also what the
+//                       legacy balance= command now drives (see setEs8388Balance)
+//         - esvol2      LOUT2/ROUT2 (headphone amp) analog volume 0-33
 //         - esch2bal    LOUT2/ROUT2 L/R balance -6..+6
 //         - esmono, esvpp, esramp, esdeemph, eslinein, esadc, esmicpga,
 //           esmicin, esmicbias, esvroi
@@ -708,6 +710,9 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
       if (strcmp(cmd, "mqtthost") == 0 || strcmp(cmd, "mqttport") == 0 ||
           strcmp(cmd, "mqtttopic") == 0 || strcmp(cmd, "mqttuser") == 0 ||
           strcmp(cmd, "mqttpass") == 0) {
+        // Declared here rather than reusing the iv from the ES8388 block above:
+        // that one only exists when ES8388_ENABLE, and MQTT does not depend on it.
+        int iv = atoi(val);
         if (strcmp(cmd, "mqtthost") == 0) {
           config.saveValue(config.store.mqtt.host, val, MQTT_HOST_LENGTH);
         } else if (strcmp(cmd, "mqttport") == 0) {
@@ -843,7 +848,7 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
           requestOnChange(GETCONTROLS, clientId);
           return;
         }
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
         if (strcmp(val, "es8388") == 0) {
           config.setEs8388Defaults();
           config.setSpeakerMute(false);
@@ -885,7 +890,7 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
         int8_t valb = atoi(val);
         if (valb < -16) valb = -16;
         if (valb >  16) valb =  16;
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
         // There is no software balance on ES8388 builds; this drives the LOUT1
         // hardware balance instead, still in the legacy -16..+16 domain so the
         // telnet, MQTT, Nextion and Home Assistant callers are unchanged.
@@ -1141,7 +1146,7 @@ void handleHTTPArgs(AsyncWebServerRequest * request) {
       int b = atoi(p->value().c_str());
       if (b < -16) b = -16;
       if (b >  16) b =  16;
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
       player.setEs8388Balance((int8_t)b);
 #else
       player.setBalance(b);

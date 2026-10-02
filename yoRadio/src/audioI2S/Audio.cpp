@@ -4758,7 +4758,7 @@ void Audio::forceMono(bool m) { // #100 mono option
     m_f_forceMono = m; // false stereo, true mono
 }
 //---------------------------------------------------------------------------------------------------------------------
-#ifndef ES8388_ENABLE
+#if !ES8388_ENABLE
 void Audio::setBalance(int8_t bal){ // bal -16...16
     if(bal < -16) bal = -16;
     if(bal >  16) bal =  16;
@@ -4776,7 +4776,7 @@ uint8_t Audio::getI2sPort() {
 }
 //---------------------------------------------------------------------------------------------------------------------
 int32_t Audio::Gain(int16_t s[2]) {
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
     // Volume and L/R balance are both applied in the ES8388, so there is nothing
     // left to do per sample and the float multiply is skipped entirely. The
     // samples were already halved by playSample(), so passing them through

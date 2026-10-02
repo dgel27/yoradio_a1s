@@ -5,9 +5,9 @@
 #include "player.h"
 #include "network.h"
 #include "telnet.h"
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
   #include "../audioES8388/ES8388.h"
-#endif // ES8388_ENABLE   
+#endif // ES8388_ENABLE
 #ifdef MQTT_ROOT_TOPIC
   #include "mqtt.h"
 #endif // MQTT_ROOT_TOPIC
@@ -203,7 +203,7 @@ void Telnet::printHelp(uint8_t clientId) {
   printf(clientId, "  wifi <ssid> <pass>      Save network, reboot\n");
   printf(clientId, "  discon                 Disconnect wifi\n");
   printf(clientId, "  boot | reset           Reboot / factory reset (!)\n");
-  #ifdef ES8388_ENABLE
+  #if ES8388_ENABLE
   printf(clientId, "  esvol <n>               set volume 0-254 (alias of the main-page volume)\n");
   printf(clientId, "  esvol1 <n>              ES8388 OUT1 (speaker) volume 0-33\n");
   printf(clientId, "  esvol2 <n>              ES8388 OUT2 (headphone) volume 0-33\n");
@@ -556,7 +556,7 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
     return;
   }
 
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
   uint8_t src, vol;
   int svol;
   extern ES8388 es; // single shared instance, owned by player.cpp
@@ -704,7 +704,7 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
       return;
   }    
       
-#endif //ES8388_ENABLE
+#endif // ES8388_ENABLE
 
 #ifdef MQTT_ROOT_TOPIC
   // Match a "<command> " prefix and skip past it. The length comes from the
@@ -713,6 +713,9 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   // first character of the argument and the match silently fails.
   #define TELNET_CMD(lit) (strncmp(str, lit, sizeof(lit) - 1) == 0)
   #define TELNET_ARG(lit) (str + sizeof(lit) - 1)
+  // svol above is scoped to the ES8388 block and these MQTT commands are not
+  // conditional on that codec, so the broker port gets its own variable.
+  int mqttPort;
 
   if (TELNET_CMD("mqtthost ")) {
       const char *h = TELNET_ARG("mqtthost ");
@@ -729,12 +732,12 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
       }
       return;
   }
-  if (sscanf(str, "mqttport %d", &svol) == 1) {
-      if (svol < 1) svol = 1;
-      if (svol > 65535) svol = 65535;
-      config.saveValue(&config.store.mqtt.port, (uint16_t)svol);
+  if (sscanf(str, "mqttport %d", &mqttPort) == 1) {
+      if (mqttPort < 1) mqttPort = 1;
+      if (mqttPort > 65535) mqttPort = 65535;
+      config.saveValue(&config.store.mqtt.port, (uint16_t)mqttPort);
       mqttReconfigure();
-      printf(clientId, "#MQTT# broker port: %d\n> ", svol);
+      printf(clientId, "#MQTT# broker port: %d\n> ", mqttPort);
       return;
   }
   if (TELNET_CMD("mqtttopic ")) {

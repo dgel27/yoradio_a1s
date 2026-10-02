@@ -144,7 +144,7 @@ void Config::_setupVersion(){
       // v6 added store.es8388 (runtime-adjustable ES8388 settings). Seed from
       // the myoptions.h defaults; without this the new EEPROM bytes are junk and
       // a stray non-zero mute/volume byte would leave the codec misconfigured.
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
       setEs8388Defaults();
 #endif
       break;
@@ -434,7 +434,7 @@ void Config::setDefaults() {
   store.screensaverPlayingEnabled = false;
   store.screensaverPlayingTimeout = 5;
   store.spmute = 0;
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
   setEs8388Defaults();
 #endif
   setMqttDefaults();
@@ -810,7 +810,7 @@ void Config::setSpeakerMute(bool muted){
   saveValue(&store.spmute, (uint8_t)(muted ? 1 : 0), true, true);
 }
 
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
 void Config::setEs8388Defaults(){
   store.es8388.es_master_vol  = ES8388_MAIN_VOLUME;
   store.es8388.es_vol1        = ES8388_OUT1_VOLUME;

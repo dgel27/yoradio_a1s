@@ -112,7 +112,7 @@ struct mqtt_t
     }
 };
 
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
 // Runtime-adjustable ES8388 settings. These are seeded from myoptions.h on
 // factory reset / version upgrade, and afterwards the web UI and telnet
 // overwrite them and persist them, so a reboot keeps the user's choice.
@@ -160,6 +160,7 @@ struct es8388_t
         return memcmp(this, &o, sizeof(es8388_t)) == 0;
     }
 };
+#endif // ES8388_ENABLE
 
 struct config_t
 {
@@ -229,7 +230,7 @@ struct config_t
   // from EEPROM cannot be told apart from a 0xFF junk byte, and junk here would
   // silently leave the amp muted. Non-zero means muted.
   uint8_t   spmute;
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
   es8388_t  es8388;  // runtime ES8388 settings, seeded from myoptions.h
 #endif
   mqtt_t    mqtt;    // broker host/port/root topic, seeded from mqttoptions.h
@@ -272,8 +273,6 @@ struct ircodes_t
   unsigned int ir_set; //must be 4224
   uint64_t irVals[20][3];
 };
-#endif
-
 #endif
 
 struct station_t
@@ -359,7 +358,7 @@ class Config {
     void setBrightness(bool dosave=false);
     void setDspOn(bool dspon, bool saveval = true);
     void setSpeakerMute(bool muted);
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
     /* Seed store.es8388 from the myoptions.h compile-time defaults. */
     void setEs8388Defaults();
 #endif
@@ -435,5 +434,4 @@ extern Config config;
 #if DSP_HSPI || TS_HSPI || VS_HSPI
 extern SPIClass  SPI2;
 #endif
-
-#endif
+#endif // config_h

@@ -192,7 +192,7 @@ public:
     void loop();
     uint32_t stopSong();
     void forceMono(bool m);
-    #ifndef ES8388_ENABLE
+    #if !ES8388_ENABLE
     /* Software volume and software L/R balance. ES8388 builds attenuate both
        in the codec (DAC master register 26/27 and the LOUT1/ROUT1 analog
        trims), so Gain() has no per-sample work left and these have no callers. */
@@ -499,7 +499,7 @@ enum : int { CODEC_NONE = 0, CODEC_WAV = 1, CODEC_MP3 = 2, CODEC_AAC = 3, CODEC_
     int             m_readbytes = 0;                // bytes read
     uint32_t        m_metacount = 0;                // counts down bytes between metadata
     int             m_controlCounter = 0;           // Status within readID3data() and readWaveHeader()
-    #ifndef ES8388_ENABLE
+    #if !ES8388_ENABLE
     int8_t          m_balance = 0;                  // -16 (mute left) ... +16 (mute right)
     uint8_t         m_vol=64;                       // volume
     #endif

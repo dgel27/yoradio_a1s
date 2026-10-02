@@ -82,17 +82,18 @@
 /* Digital volume, register 26/27 (LDACVOL/RDACVOL), attenuates BOTH analog
    outputs. 0..192, where 192 = 0dB (unity) and 0 = -96dB, 0.5dB per step.
    192 (0dB) is safe because the software chain can never exceed the decoder's
-   own output: Audio halves each sample, the biquad tone gains are clamped to
-   +6dB, and Gain() at m_vol 254 is ~unity, so the worst case nets to 0dB.
-   This is a fixed trim; the user's volume slider is the software path
-   (index.html "volume" -> config.store.volume -> Audio::setVolume). */
+   own output: Audio halves each sample and the biquad tone gains are clamped to
+   +6dB, so the worst case nets to 0dB. For ES8388 builds this register is
+   driven by the main-page slider instead (index.html "volume" ->
+   config.store.volume -> Player::applyEs8388Volume); this define only seeds a
+   field nothing reads, kept so sizeof(config_t) and the EEPROM layout hold. */
 #define ES8388_MAIN_VOLUME     192     // 0dB, unity
 
 /* Analog output volume, registers 46/47 (LOUT1/ROUT1) and 48/49 (LOUT2/ROUT2).
    0..33, where 30 = 0dB and 33 = +4.5dB, 1.5dB per step, 0 = -45dB. The field
    is 6 bits wide, so values above 33 are clamped rather than bleeding into the
-   reserved bits. On this board OUT1 is the headphone amp and OUT2 the
-   on-board speaker amp. */
+   reserved bits. On this board OUT1 is the on-board speaker amp and OUT2 the
+   headphone amp. */
 #define ES8388_OUT1_VOLUME     30      // 0dB into the headphone amp
 #define ES8388_OUT2_VOLUME     30      // 0dB into the speaker amp
 

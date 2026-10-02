@@ -6,7 +6,7 @@
 #include "sdmanager.h"
 #include "netserver.h"
 
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
   #include "../audioES8388/ES8388.h"
   // Single shared codec instance. player.cpp owns it; netserver.cpp and
   // telnet.cpp use this one instead of declaring their own.
@@ -61,7 +61,7 @@ void Player::init() {
     begin();
   #endif
 
-  #ifdef ES8388_ENABLE
+  #if ES8388_ENABLE
   //++++++++ Add for Audio Kit 2.3 A247 with ES8388 codec
   Serial.printf("Connect to ES8388 codec... ");
   // Init I2C control communication with ES8388
@@ -79,7 +79,7 @@ void Player::init() {
   //-------- for Audio Kit 2.3 A247 with ES8388 codec
   #endif // ES8388_ENABLE
   
-#ifndef ES8388_ENABLE
+#if !ES8388_ENABLE
   // Software volume and software L/R balance both live in Audio::Gain(), which
   // ES8388 builds do not use: the main-page volume is attenuated in the DAC's
   // master register (applyEs8388Volume) and balance is the LOUT1 hardware trim
@@ -102,7 +102,7 @@ void Player::init() {
   Serial.println("done");
 }
 
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
 /* Set one analog output from a volume plus an L/R balance offset.
    balance -6..+6: positive favours the left channel.
 
@@ -424,7 +424,7 @@ void Player::loop() {
       }
       case PR_VOL: {
         config.setVolume(requestP.payload);
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
         applyEs8388Volume(requestP.payload);
 #else
         setVolume(volToI2S(requestP.payload));
@@ -478,7 +478,7 @@ void Player::prepareForRestart() {
     pinMode(MUTE_PIN, OUTPUT);
     digitalWrite(MUTE_PIN, MUTE_LOCK ? !MUTE_VAL : MUTE_VAL);
   }
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
   // Power the DAC down regardless of the standby setting: a restart is not a
   // normal stop, so the user's es_standby preference should not keep the output
   // stage alive through it.
@@ -497,7 +497,7 @@ void Player::setOutputPins(bool isPlaying) {
   bool ampOn = isPlaying && !_spmute;
   bool _ml = MUTE_LOCK ? !MUTE_VAL : (ampOn ? !MUTE_VAL : MUTE_VAL);
   if(MUTE_PIN!=255) digitalWrite(MUTE_PIN, _ml);
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
   // Optionally park the codec in standby while nothing is playing, and wake it
   // again before the first sample of playback. Driven by the persisted
   // es_standby flag so the user can toggle it without reflashing.
@@ -623,7 +623,7 @@ void Player::toggle() {
 }
 
 void Player::stepVol(bool up) {
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
   // Step in master-register space so a detent is always at least one 0.5 dB
   // step. volsteps keeps its meaning as a multiplier, but now in 0.5 dB units
   // rather than 0..254 user units, so it lands on real register values.
@@ -645,7 +645,7 @@ void Player::stepVol(bool up) {
 #endif
 }
 
-#ifndef ES8388_ENABLE
+#if !ES8388_ENABLE
 uint8_t Player::volToI2S(uint8_t volume) {
   int vol = map(volume, 0, 254 - config.station.ovol * 3 , 0, 254);
   if (vol > 254) vol = 254;
@@ -655,7 +655,7 @@ uint8_t Player::volToI2S(uint8_t volume) {
 #endif // !ES8388_ENABLE
 
 void Player::_loadVol(uint8_t volume) {
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
   applyEs8388Volume(volume);
 #else
   setVolume(volToI2S(volume));

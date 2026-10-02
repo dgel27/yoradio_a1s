@@ -169,7 +169,7 @@ void Nextion::loop() {
             display.putRequest(NEWMODE, INFO);
           }
           if(strcmp(scanBuf, "eq") == 0) {
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
             // The HMI shows the legacy -16..+16 balance; report the hardware
             // value mapped back into that domain so the slider still lines up.
             int8_t nBalance = player.getEs8388Balance();
@@ -240,7 +240,7 @@ void Nextion::loop() {
           player.sendCommand({PR_VOL, scanDigit});
         }
         if (sscanf(rxbuf, "balance=%d", &scanDigit) == 1){
-#ifdef ES8388_ENABLE
+#if ES8388_ENABLE
           // ES8388 builds have no software balance; the HMI's -16..+16 slider
           // drives the LOUT1 hardware trim through the same path the web UI uses.
           player.setEs8388Balance((int8_t)scanDigit);
