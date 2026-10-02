@@ -6,7 +6,17 @@
 #endif
 
 #ifndef YOVERSION
-  #define YOVERSION "0.9.434_A1S"
+  #define YOVERSION "0.9.435_A1S"
+#endif
+
+/* scripts/embed_version.py runs before every build and defines BUILD_VERSION as
+   "<YOVERSION>+fw.<commit>.fs.<hash>", so the version in the web UI footer, over
+   telnet and in the boot log always identifies the exact build. It is defined
+   only by that script, so an IDE build that does not run it falls back to
+   YOVERSION above. */
+#ifdef BUILD_VERSION
+  #undef YOVERSION
+  #define YOVERSION BUILD_VERSION
 #endif
 
 /*******************************************************

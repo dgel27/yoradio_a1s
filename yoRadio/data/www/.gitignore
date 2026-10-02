@@ -1,0 +1,3 @@
+# Written by scripts/embed_version.py on every build. It records the firmware and
+# filesystem identities of the SPIFFS image, so it is an output, not a source.
+version.json
