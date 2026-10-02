@@ -278,7 +278,16 @@ void NetServer::processQueue(){
             if (ENC_BTNL != 255 || ENC2_BTNL != 255 || dbgact)  act += F("\"group_encoder\",");
             if (IR_PIN != 255 || dbgact)                        act += F("\"group_ir\",");
             if (ES8388_ENABLE || dbgact)                        act += F("\"group_es8388\",");
-            if (MQTT_ROOT_TOPIC || dbgact)                      act += F("\"group_mqtt\",");
+            // MQTT_ROOT_TOPIC is a string literal, so "if (MQTT_ROOT_TOPIC)"
+            // would be a pointer test and always true. MQTT is compiled in
+            // whenever the macro exists, and the settings page needs this
+            // group to reach the broker settings, so the group is listed on the
+            // same condition the rest of the file uses for a compiled-in
+            // feature: the macro is defined. dbgact is already covered because
+            // this project always ships mqttoptions.h.
+          #if defined(MQTT_ROOT_TOPIC)
+            act += F("\"group_mqtt\",");
+          #endif
           }
                                                                 act = act.substring(0, act.length() - 1);
           sprintf (wsbuf, "{\"act\":[%s]}", act.c_str());

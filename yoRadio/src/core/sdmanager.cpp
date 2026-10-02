@@ -1,7 +1,12 @@
+// options.h has to be visible before the guard below: SDC_CS is a macro, and an
+// undefined identifier evaluates to 0 in the preprocessor, so testing it before
+// any include made "0 != 255" true and compiled the whole SD stack even when SD
+// was not fitted. sdmanager.h includes options.h, so include it first, the same
+// way rtcsupport.cpp and touchscreen.cpp do.
+#include "sdmanager.h"
 #if SDC_CS!=255
 
 #define USE_SD
-#include "sdmanager.h"
 #include "display.h"
 #include "player.h"
 
