@@ -218,8 +218,8 @@ void Telnet::printHelp(uint8_t clientId) {
   printf(clientId, "  esclick on|off          ES8388 click-free power up/down\n");
   printf(clientId, "  esinvl on|off           ES8388 invert left channel\n");
   printf(clientId, "  esinvr on|off           ES8388 invert right channel\n");
-  printf(clientId, "  eslinein on|off         ES8388 mix line-in to outputs\n");
-  printf(clientId, "  eslingain <dB>          ES8388 line-in mix gain -15..+6\n");
+  printf(clientId, "  eslinein off|mix|line   ES8388 line-in: off, mixed with radio, or line only\n");
+  printf(clientId, "  eslingain <dB>          ES8388 line-in gain -15..+6, in 3dB steps\n");
   printf(clientId, "  esadc on|off            ES8388 power up the ADC\n");
   printf(clientId, "  esmicpga <n>            ES8388 mic preamp gain 0-8 (0..+24dB)\n");
   printf(clientId, "  esmicin <n>             ES8388 mic input 0=LIN1 1=LIN2 2=diff\n");
@@ -648,8 +648,9 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   if (strcmp(str, "esramp off") == 0)  { config.saveValue(&E.es_soft_ramp,(uint8_t)0); es.volume_ramp(0); printf(clientId, "#ES8388.RAMP# off\n> "); return; }
   if (strcmp(str, "esvroi on") == 0)   { config.saveValue(&E.es_vroi,(uint8_t)1); es.output_impedance(true);  printf(clientId, "#ES8388.VROI# 40k\n> "); return; }
   if (strcmp(str, "esvroi off") == 0)  { config.saveValue(&E.es_vroi,(uint8_t)0); es.output_impedance(false); printf(clientId, "#ES8388.VROI# 1.5k\n> "); return; }
-  if (strcmp(str, "eslinein on") == 0) { config.saveValue(&E.es_linein,(uint8_t)1); es.line_in_mix(true, E.es_linein_gain);  printf(clientId, "#ES8388.LINEIN# mixed in\n> "); return; }
-  if (strcmp(str, "eslinein off") == 0){ config.saveValue(&E.es_linein,(uint8_t)0); es.line_in_mix(false, E.es_linein_gain); printf(clientId, "#ES8388.LINEIN# off\n> "); return; }
+  if (strcmp(str, "eslinein off") == 0) { config.saveValue(&E.es_linein,(uint8_t)ES8388::LINEIN_OFF);  player.applyOutputRouting(); printf(clientId, "#ES8388.LINEIN# off (radio only)\n> "); return; }
+  if (strcmp(str, "eslinein mix") == 0) { config.saveValue(&E.es_linein,(uint8_t)ES8388::LINEIN_MIX);  player.applyOutputRouting(); printf(clientId, "#ES8388.LINEIN# mixed with radio at %d dB\n> ", (int)E.es_linein_gain); return; }
+  if (strcmp(str, "eslinein line") == 0){ config.saveValue(&E.es_linein,(uint8_t)ES8388::LINEIN_ONLY); player.applyOutputRouting(); printf(clientId, "#ES8388.LINEIN# line only (radio muted, DAC path off)\n> "); return; }
   if (strcmp(str, "esadc on") == 0)    { config.saveValue(&E.es_adc,(uint8_t)1); es.adc_power(true);  printf(clientId, "#ES8388.ADC# powered up\n> "); return; }
   if (strcmp(str, "esadc off") == 0)   { config.saveValue(&E.es_adc,(uint8_t)0); es.adc_power(false); printf(clientId, "#ES8388.ADC# powered down\n> "); return; }
   if (strcmp(str, "esmicbias on") == 0){ config.saveValue(&E.es_mic_bias,(uint8_t)1); es.mic_bias(true);  printf(clientId, "#ES8388.MICBIAS# on\n> "); return; }
@@ -669,9 +670,12 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   if (strcmp(str, "esinvr off") == 0) { config.saveValue(&E.es_invr,(uint8_t)0); es.channel_invert(E.es_invl, false); printf(clientId, "#ES8388.INVR# normal\n> "); return; }
   if (sscanf(str, "eslingain %d", &svol) == 1) {
     if (svol < -15) svol = -15; if (svol > 6) svol = 6;
-    printf(clientId, "#ES8388.LINGAIN# set line-in mix gain: %d dB (-15..+6) \n> ", svol);
+    // Snap to the register's 3 dB grid so the stored value is what actually
+    // reaches the chip, not something the slider would have to round.
+    svol = 6 - ((6 - svol) / 3) * 3;
+    printf(clientId, "#ES8388.LINGAIN# set line-in gain: %d dB (-15..+6, 3dB steps) \n> ", svol);
     config.saveValue(&E.es_linein_gain, (int8_t)svol);
-    es.line_in_mix(E.es_linein, (int8_t)svol);
+    player.applyOutputRouting();
       return;
   }
   if (strcmp(str, "esstandby on") == 0) { config.saveValue(&E.es_standby,(uint8_t)1); player.setEs8388Standby(true);  printf(clientId, "#ES8388.STANDBY# on (codec sleeps when stopped)\n> "); return; }
@@ -679,10 +683,10 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   if (strcmp(str, "esspk mute") == 0)  { config.setSpeakerMute(true);  player.setSpeakerMute(true);  printf(clientId, "#ES8388.SPK# muted\n> "); return; }
   if (strcmp(str, "esspk unmute") == 0){ config.setSpeakerMute(false); player.setSpeakerMute(false); printf(clientId, "#ES8388.SPK# unmuted\n> "); return; }
   if (sscanf(str, "esmute2 %d", &svol) == 1) {
-    // Saved, then pushed through applyOutputMutes() rather than es.mute(), so
+    // Saved, then pushed through applyOutputRouting() rather than es.mute(), so
     // the jack-detect override stays the arbiter of what reaches the chip.
     config.saveValue(&E.es_mute2, (uint8_t)(svol!=0));
-    player.applyOutputMutes();
+    player.applyOutputRouting();
     printf(clientId, "#ES8388.MUTE2# headphone amp mute stored: %d%s\n> ",
            svol!=0 ? 1 : 0,
 #if HP_DETECT!=255

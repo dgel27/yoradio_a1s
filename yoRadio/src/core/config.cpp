@@ -827,7 +827,9 @@ void Config::setEs8388Defaults(){
   store.es8388.es_invl        = ES8388_INVERT_L;
   store.es8388.es_invr        = ES8388_INVERT_R;
   store.es8388.es_vroi        = ES8388_VROI;
-  store.es8388.es_linein      = ES8388_LINEIN_MIX;
+  // ES8388_LINEIN_MIX seeds 0/1; the field is a 3-state mode now
+  // (off/mix/line-only), so clamp rather than trust the define.
+  store.es8388.es_linein      = ES8388_LINEIN_MIX > 2 ? 2 : ES8388_LINEIN_MIX;
   store.es8388.es_linein_gain = ES8388_LINEIN_GAIN;
   store.es8388.es_adc         = 0;
   store.es8388.es_mic_pga     = ES8388_MIC_PGA;

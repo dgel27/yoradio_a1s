@@ -75,6 +75,26 @@ public:
         ES_OUT2  // LOUT2/ROUT2 (regs 48/49) = headphone amp
     };
 
+    /* What the analog line input contributes to the outputs. The line jack is
+       summed inside the codec at regs 39/42, which sit DOWNSTREAM of the DAC
+       digital volume (regs 26/27) - so the three modes differ only in whether
+       the line-in bit is set and whether the DAC path is muted:
+
+         OFF   line-in absent. Radio only.
+         MIX   line-in summed with the radio, ratio set by gain_db.
+         ONLY  line-in present and the DAC digital path muted, which silences
+               the radio while line-in keeps playing. Line-in joins after the
+               DAC, so muting the digital path cannot touch it.
+
+       Note the main-page volume does not reach line-in for the same reason:
+       it is a digital attenuator and line-in enters downstream of it. */
+    enum ES8388_LINEIN
+    {
+        LINEIN_OFF  = 0,
+        LINEIN_MIX  = 1,
+        LINEIN_ONLY = 2
+    };
+
     bool begin(int sda = -1, int scl = -1, uint32_t frequency = 400000U);
 
     /* Digital volume: 0..192, where 192 is 0dB and 0 is -96dB (0.5dB steps) */
@@ -107,6 +127,8 @@ public:
 
     /* Line input (LIN1/LIN2) contribution to the output mixers */
     void line_in_mix(const bool on, const int8_t gain_db);
+    /* As above, with the three-way off/mix/line-only routing. */
+    void line_in_mix_mode(const uint8_t mode, const int8_t gain_db);
 
     /* Mic PGA, 0..8 -> 0..+24dB in 3dB steps */
     void mic_gain(const uint8_t gain);

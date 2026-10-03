@@ -118,12 +118,15 @@ class Player: public Audio {
     void stepVolumeBy(int steps);
     /* Park/wake the codec with playback; also flips the persisted flag. */
     void setEs8388Standby(bool on);
-    /* The three codec output mutes, with the headphone-jack override folded in.
-       Every path that can change an output enable goes through here: the
-       settings apply, every es.wake(), and the jack-detect handler. Writing
-       es.mute() directly anywhere else is how the forced mute gets undone -
-       es.wake() rewrites DACPOWER to 0x3C, which re-enables BOTH outputs. */
-    void applyOutputMutes();
+    /* Output routing: the three codec output mutes and the line-in mixers, with
+       the headphone-jack override and the line-in "only" mode folded in. Every
+       path that can change an output enable goes through here: the settings
+       apply, every es.wake(), the jack-detect handler, and the line-in command.
+       Writing es.mute() or es.line_in_mix_mode() directly anywhere else is how
+       those states get undone - es.wake() rewrites DACPOWER to 0x3C, which
+       re-enables BOTH outputs, and the mixers and the ES_MAIN mute have to stay
+       consistent with each other. */
+    void applyOutputRouting();
     /* Recompute _hpForced from the debounced jack state and push the result.
        Called on every detected transition and whenever the user's own es_mute2
        changes underneath us. */

@@ -76,12 +76,16 @@ bool ES8388::begin(int sda, int scl, uint32_t frequency)
     res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL4, 0x00);
     res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL5, 0x00);
 
-    /* Output mixers: LDAC/RDAC to LOUT/ROUT, line-in at -12dB. LMIXSEL/RMIXSEL
-       select LIN1/RIN1. The old code used 0x90 (line-in at 0dB) and an
-       accidental 0x1B for the source select. */
+    /* Output mixers: LDAC/RDAC to LOUT/ROUT, line-in present but not mixed in.
+       LMIXSEL/RMIXSEL select LIN1/RIN1. The old code used 0x90 (line-in at 0dB)
+       and an accidental 0x1B for the source select.
+       0xB8 = LD2LO=1, LI2LO=0 (off), LI2LOVOL=111 which is -15dB, not the -12dB
+       an earlier comment here claimed. It is transient either way:
+       Player::applyEs8388Settings() rewrites both mixers immediately afterwards
+       with the stored mode and gain. */
     res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL16, 0x00); // LMIXSEL=LIN1, RMIXSEL=RIN1
-    res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL17, 0xB8); // LD2LO=1, line-in -12dB
-    res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL20, 0xB8); // RD2RO=1, line-in -12dB
+    res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL17, 0xB8); // LD2LO=1, line-in off at -15dB
+    res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL20, 0xB8); // RD2RO=1, line-in off at -15dB
 
     res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL23, 0x00); // VROI=0: 1.5k output resistance
 
@@ -259,12 +263,30 @@ void ES8388::output_impedance(const bool high)
  */
 void ES8388::line_in_mix(const bool on, const int8_t gain_db)
 {
-    // LI2LOVOL / RI2ROVOL: 000=+6dB .. 111=-15dB
+    line_in_mix_mode(on ? LINEIN_MIX : LINEIN_OFF, gain_db);
+}
+
+/**
+ * @brief Route the line input as off, mixed with the DAC, or on its own.
+ *
+ * Reg 39 (DACCONTROL17) and reg 42 (DACCONTROL20) each carry
+ *   LD2LO/RD2RO (7) LI2LO/RI2RO (6) LI2LOVOL/RI2ROVOL (5:3)
+ * LD2LO stays 1 so the DAC keeps its route; LI2LO is what adds line-in on top.
+ * That is why this can never be "line-in instead of the radio" on its own -
+ * see line_in_mix_mode()'s enum comment for how LINEIN_ONLY is achieved.
+ *
+ * The exclusive case is not handled here: muting the DAC digital path is the
+ * caller's job, because ES_MAIN is a shared control and Player owns it.
+ */
+void ES8388::line_in_mix_mode(const uint8_t mode, const int8_t gain_db)
+{
+    // LI2LOVOL / RI2LOVOL: 000=+6dB .. 111=-15dB
     int8_t g = gain_db;
     if (g > 6) g = 6;
     if (g < -15) g = -15;
     uint8_t code = (uint8_t)((6 - g) / 3); // 6dB->0 ... -15dB->7
     uint8_t bits = (uint8_t)(code << 3);
+    bool on = mode != LINEIN_OFF;
 
     // reg 39: LD2LO(7) LI2LO(6) LI2LOVOL(5:3). Keep LD2LO=1 (DAC always routed).
     uint8_t l = 0;

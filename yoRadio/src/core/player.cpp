@@ -187,7 +187,7 @@ void Player::applyEs8388Settings()
     // EEPROM layout stay stable; it is no longer a user setting.
     setEs8388Out(ES8388::ES_OUT1, e.es_vol1, e.es_bal1);
     setEs8388Out(ES8388::ES_OUT2, e.es_vol2, e.es_bal2);
-    applyOutputMutes();
+    applyOutputRouting();
 
     // DAC Control 7 (0x1d): stereo enhancement, mono, Vpp scale
     es.stereo_eff(e.es_stereo_eff > 7 ? 7 : e.es_stereo_eff);
@@ -207,8 +207,9 @@ void Player::applyEs8388Settings()
     // DAC Control 23 (0x2d): output impedance reference
     es.output_impedance(e.es_vroi);
 
-    // Output mixers: line-in contribution
-    es.line_in_mix(e.es_linein, e.es_linein_gain);
+    // Output mixers and output enables are handled together by
+    // applyOutputRouting(), because the line-in mode and the ES_MAIN mute have
+    // to agree with each other.
 
     // ADC / microphone
     es.mic_gain(e.es_mic_pga > 8 ? 8 : e.es_mic_pga);
@@ -217,15 +218,27 @@ void Player::applyEs8388Settings()
     es.adc_power(e.es_adc);
 }
 
-/* The single place an analog output enable is written.
-   applyEs8388Settings() pulls the three mutes out into here so that
-   applyOutputMutes() can re-apply them after an es.wake(): standby/wake rewrites
-   DACPOWER to 0x3C, which sets the OUT1 and OUT2 enable bits together, so a
-   headphone mute applied before a wake would silently come back on with it. */
-void Player::applyOutputMutes()
+/* The single place output routing is written: the three mutes plus the line-in
+   mixers.
+   applyEs8388Settings() pulls these out into here so that applyOutputRouting()
+   can re-apply them after an es.wake() - standby/wake rewrites DACPOWER to
+   0x3C, which sets the OUT1 and OUT2 enable bits together, so a headphone mute
+   applied before a wake would silently come back on with it. The line-in
+   exclusive mode has the same exposure, since its mute lives in DACCONTROL3
+   and would otherwise be unaffected by that wake. */
+void Player::applyOutputRouting()
 {
     es8388_t &e = config.store.es8388;
-    es.mute(ES8388::ES_MAIN, e.es_mute_main);
+    // Clamp the stored mode rather than trusting it: the field used to be a
+    // boolean, so an EEPROM written by an older build can hold a value that is
+    // not a mode. Anything past LINEIN_ONLY falls back to off.
+    uint8_t lineIn = e.es_linein > ES8388::LINEIN_ONLY ? ES8388::LINEIN_OFF : e.es_linein;
+    bool lineInOnly = lineIn == ES8388::LINEIN_ONLY;
+
+    // The line jack joins the output mixers downstream of the DAC, so muting the
+    // DAC digital path silences the radio without touching line-in. That is the
+    // whole mechanism behind the "line only" mode.
+    es.mute(ES8388::ES_MAIN, e.es_mute_main != 0 || lineInOnly);
     es.mute(ES8388::ES_OUT1, e.es_mute1);
     // The headphone amp is additionally silenced while the jack reads empty, so
     // an unplugged output is not left driving an amplifier with nothing on it.
@@ -237,6 +250,9 @@ void Player::applyOutputMutes()
     hpSilent = _hpForced;
 #endif
     es.mute(ES8388::ES_OUT2, e.es_mute2 != 0 || hpSilent);
+    // Routed here rather than in applyEs8388Settings() so the mixers cannot end
+    // up describing a different mode from the mute state above.
+    es.line_in_mix_mode(lineIn, e.es_linein_gain);
 }
 
 /* Recompute the forced flag from the current jack state and push it out. Called
@@ -251,7 +267,7 @@ void Player::applyHeadphoneRouting()
               _hpForced ? "headphone amp silenced" : "headphone amp as configured");
     }
 #endif
-    applyOutputMutes();
+    applyOutputRouting();
 }
 
 #if HP_DETECT!=255
@@ -580,7 +596,7 @@ void Player::setOutputPins(bool isPlaying) {
       // wake() rewrites DACPOWER to 0x3C and re-enables both analog outputs, so
       // the headphone mute has to be put back on top or a jack-detected unplug
       // would be undone every time playback resumed.
-      applyOutputMutes();
+      applyOutputRouting();
     }
     else if (!isPlaying && !es_sleeping) es.standby();
     es_sleeping = !isPlaying;

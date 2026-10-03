@@ -141,7 +141,12 @@ struct es8388_t
     // --- DAC Control 23 (0x2d) ---
     uint8_t es_vroi;         // 0 = 1.5k output impedance, 1 = 40k
     // --- output mixers (0x27/0x2a) ---
-    uint8_t es_linein;       // 1 = mix LIN1/LIN2 into the outputs
+    /* Line-in routing, ES8388_LINEIN: 0 = off, 1 = mixed with the DAC,
+       2 = line-in only (radio muted). Widened from a boolean to a 3-state mode;
+       the field was already uint8_t so the EEPROM layout is unchanged and no
+       config version bump is needed. Player::applyOutputRouting() clamps a value
+       from an older build that falls outside the range. */
+    uint8_t es_linein;
     int8_t  es_linein_gain;  // -15..+6 dB, 3dB steps
     // --- ADC (0x03/0x09/0x0a) ---
     uint8_t es_adc;          // 1 = power up the ADC

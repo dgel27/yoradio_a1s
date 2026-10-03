@@ -211,8 +211,17 @@
 
           <div class="flex-row">
             <div class="inputwrap">
-              <span class="inputtitle">Mix line-in to outputs</span>
-              <div class="checkbox off nous" id="eslinein"></div>
+              <span class="inputtitle">Line-in routing</span>
+              <span class="inputinfo" id="es_lineininfo">off</span>
+              <input type="range" id="es_linein" class="slider" data-slaveid="es_lineininfo" data-slavelabels="off,mix,line only" name="eslinein" min="0" max="2" step="1" value="0">
+            </div>
+          </div>
+
+          <div class="flex-row">
+            <div class="inputwrap">
+              <span class="inputtitle">Line-in level (dB)</span>
+              <span class="inputinfo" id="es_lingaininfo">-12</span>
+              <input type="range" id="es_lingain" class="slider" data-slaveid="es_lingaininfo" name="eslingain" min="-15" max="6" step="3" value="-12">
             </div>
           </div>
 

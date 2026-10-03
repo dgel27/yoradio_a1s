@@ -139,9 +139,12 @@
 /* DAC Control 23 (0x2d): analog output impedance reference */
 #define ES8388_VROI            false   // false = 1.5k (default), true = 40k
 
-/* Output mixer line-in contribution. false keeps LIN1/LIN2 out of the outputs
-   (only the DAC is heard), which is the safe default with nothing plugged
-   into the line-in pins. */
+/* Line-in routing, the analogue input on the J1 jack. 0 = off (radio only),
+   1 = mixed in with the radio, 2 = line-in only (the radio's digital path is
+   muted, which line-in survives because it joins after the DAC).
+
+   false/0 is the safe default with nothing plugged into J1: line-in left on with
+   an empty jack just amplifies noise. */
 #define ES8388_LINEIN_MIX      false
 #define ES8388_LINEIN_GAIN     -12     // -15..+6 dB, 3dB steps
 

@@ -360,10 +360,15 @@ void NetServer::processQueue(){
           // esmv is the MAIN-PAGE volume (0..254), not the old es_master_vol:
           // the master register is now driven by that slider, so reporting it
           // keeps the settings page showing the level actually in effect.
-          sprintf (wsbuf, "{\"esmv\":%d,\"esv1\":%d,\"esb1\":%d,\"esv2\":%d,\"esb2\":%d,\"esse\":%d,\"esmu\":%d,\"esmu2\":%d,\"esvpp\":%d,\"esde\":%d,\"esmo\":%d,\"esra\":%d,\"esvr\":%d,\"esli\":%d,\"esad\":%d,\"espg\":%d,\"esmi\":%d,\"esmb\":%d,\"essb\":%d}",
+          // snprintf, not sprintf: this reply grew to ~300 chars and wsbuf is
+          // BUFLEN*2 = 340, so an unbounded write is a real overflow risk now
+          // that eslg has been added. esli is the 0/1/2 line-in MODE (it used to
+          // be a boolean) and eslg is its gain in dB.
+          snprintf (wsbuf, BUFLEN * 2, "{\"esmv\":%d,\"esv1\":%d,\"esb1\":%d,\"esv2\":%d,\"esb2\":%d,\"esse\":%d,\"esmu\":%d,\"esmu2\":%d,\"esvpp\":%d,\"esde\":%d,\"esmo\":%d,\"esra\":%d,\"esvr\":%d,\"esli\":%d,\"eslg\":%d,\"esad\":%d,\"espg\":%d,\"esmi\":%d,\"esmb\":%d,\"essb\":%d}",
                                   config.store.volume, e.es_vol1, (int)e.es_bal1, e.es_vol2, (int)e.es_bal2,
                                   e.es_stereo_eff, config.store.spmute, e.es_mute2, e.es_vpp, e.es_deemph,
-                                  e.es_mono, e.es_soft_ramp, e.es_vroi, e.es_linein, e.es_adc,
+                                  e.es_mono, e.es_soft_ramp, e.es_vroi, e.es_linein,
+                                  (int)e.es_linein_gain, e.es_adc,
                                   e.es_mic_pga, e.es_mic_sel, e.es_mic_bias, e.es_standby);
         }
 #endif
@@ -713,19 +718,41 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
       if (strcmp(cmd, "esramp") == 0)   { config.saveValue(&E.es_soft_ramp, (uint8_t)(u8!=0)); es.volume_ramp(u8?E.es_ramp_rate:0); return; }
       if (strcmp(cmd, "esdeemph") == 0) { if(u8>3)u8=3; config.saveValue(&E.es_deemph, u8); es.deemphasis(u8); return; }
       if (strcmp(cmd, "esvroi") == 0)   { config.saveValue(&E.es_vroi, (uint8_t)(u8!=0)); es.output_impedance(u8!=0); return; }
-      if (strcmp(cmd, "eslinein") == 0) { config.saveValue(&E.es_linein, (uint8_t)(u8!=0)); es.line_in_mix(u8!=0, E.es_linein_gain); return; }
+      if (strcmp(cmd, "eslinein") == 0) {
+        // 0=off 1=mix 2=line only. Not coerced to a boolean any more: the "only"
+        // mode is a real state, and it needs the ES_MAIN mute and the mixer
+        // bit to change together, which is what applyOutputRouting() does.
+        if (u8 > 2) u8 = 2;
+        config.saveValue(&E.es_linein, u8);
+        player.applyOutputRouting();
+        return;
+      }
+      if (strcmp(cmd, "eslingain") == 0) {
+        int g = iv > 6 ? 6 : iv;
+        if (g < -15) g = -15;
+        // The gain only lives in the mixer registers, which applyOutputRouting
+        // also owns, so go through it rather than calling line_in_mix_mode() here
+        // and leaving the mode and the gain written from two places.
+        // The register only has 3 dB steps, so snap to the nearest one instead of
+        // storing something the slider cannot show. The codec rounds the same
+        // way, so this just makes the stored value match what is really applied.
+        g = 6 - ((6 - g) / 3) * 3;
+        config.saveValue(&E.es_linein_gain, (int8_t)g);
+        player.applyOutputRouting();
+        return;
+      }
       if (strcmp(cmd, "esadc") == 0)    { config.saveValue(&E.es_adc, (uint8_t)(u8!=0)); es.adc_power(u8!=0); return; }
       if (strcmp(cmd, "esmicpga") == 0) { if(u8>8)u8=8; config.saveValue(&E.es_mic_pga, u8); es.mic_gain(u8); return; }
       if (strcmp(cmd, "esmicin") == 0)  { if(u8>2)u8=2; config.saveValue(&E.es_mic_sel, u8); es.mic_input(u8); return; }
       if (strcmp(cmd, "esmicbias") == 0){ config.saveValue(&E.es_mic_bias, (uint8_t)(u8!=0)); es.mic_bias(u8!=0); return; }
       if (strcmp(cmd, "esstandby") == 0) { config.saveValue(&E.es_standby, (uint8_t)(u8!=0)); player.setEs8388Standby(u8!=0); return; }
       /* Headphone amp mute. Deliberately NOT routed through es.mute() here:
-         Player::applyOutputMutes() owns that write so it can fold in the
-         jack-detect override. Saving the field while nothing is plugged in is
-         allowed and useful - it just does not reach the chip until a headphone
-         is plugged back in, which is what the greyed-out checkbox is telling
-         the user. */
-      if (strcmp(cmd, "esmute2") == 0)  { config.saveValue(&E.es_mute2, (uint8_t)(iv!=0)); player.applyOutputMutes(); return; }
+         Player::applyOutputRouting() owns that write so it can fold in the
+         jack-detect override and keep the mixers consistent with it. Saving the
+         field while nothing is plugged in is allowed and useful - it just does
+         not reach the chip until a headphone is plugged back in, which is what
+         the greyed-out checkbox is telling the user. */
+      if (strcmp(cmd, "esmute2") == 0)  { config.saveValue(&E.es_mute2, (uint8_t)(iv!=0)); player.applyOutputRouting(); return; }
 
       if (strcmp(cmd, "hpmutesp") == 0) {
         config.setSpeakerMute(iv != 0);

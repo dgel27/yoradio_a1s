@@ -462,6 +462,46 @@ esmute2 <0|1>      # stored headphone mute; overridden while unplugged
 
 ---
 
+## 4c. Line input (J1) and how it is routed
+
+**J1 is the line-in jack**: pin 3 is `INL`, pin 4 is `INR`, pin 2 is `AGND`. It
+feeds the module's `LINEINL` / `LINEINR` (module pins 22 and 21), which are
+analog — no GPIO, nothing to configure in `myoptions.h`.
+
+The signal never reaches the ESP32. It is summed inside the ES8388 at registers 39
+and 42, which sit **downstream of the DAC**. That single fact explains the whole
+behaviour:
+
+| Setting | Result |
+|---|---|
+| **off** | radio only |
+| **mix** | radio **and** line-in together, ratio from the level control |
+| **line only** | line-in alone — the radio's digital path is muted, and line-in survives it |
+
+Two consequences worth knowing before you set it up:
+
+- **The volume slider does not control line-in.** Volume is a digital attenuator
+  at registers 26/27, upstream of where line-in joins. Turning the main volume
+  down will not quiet it. In **line only** mode the speaker/headphone volume
+  sliders act as a line-in fader instead (~45 dB), since they are after the
+  mixer; in **mix** mode the only control is the 3 dB-step line-in level.
+- **Equalisation does not apply to line-in.** Bass/middle/treble are biquads in
+  software, on decoded samples only — there is no analog filter on the line-in
+  path. Nor do mono, stereo widening, the VU meter or the DAC Vpp scale. Getting
+  EQ would mean routing line-in through the ADC into I2S, which is a much larger
+  piece of work than it looks; see `ES8388.md`.
+
+From telnet:
+
+```
+eslinein off|mix|line   line-in routing
+eslingain <dB>          -15..+6 in 3 dB steps
+```
+
+Both are on the settings page as well, under *Line-in routing* and *Line-in level*.
+
+---
+
 ## 5. What this means for this build
 
 `yoRadio/myoptions.h` currently uses:
