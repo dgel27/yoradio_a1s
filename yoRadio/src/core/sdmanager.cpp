@@ -23,12 +23,45 @@ SPIClass  SDSPI(HOOPSENb);
 
 SDManager sdman(FSImplPtr(new VFSImpl()));
 
+/* SDFS::begin() in framework-arduinoespressif32 calls spi.begin() with NO
+   arguments, which silently resets the SPI pins to that bus's native set and
+   throws away anything SD_SPIPINS asked for. On HSPI (SPI2) those natives are
+   12/13/14/15, so MISO landed on GPIO12 - which on the A1S microSD is card pin 1,
+   DAT2, explicitly "not used" in SPI mode. The card still initialised, because
+   init is write-heavy, but every file read came back empty.
+
+   Pin the pins AFTER SDFS::begin() has done its bare spi.begin(), then call it
+   again: the FatFs card object keeps a pointer to the same SPIClass, so it picks
+   the new routing up without being rebuilt. Without the second begin() the
+   already-mounted card would keep using the old matrix and the fix would look
+   like it had done nothing. */
+static void pinSdSpiPins()
+{
+#if defined(SD_SPIPINS) || SD_HSPI
+  #if defined(SD_SPIPINS)
+    SDREALSPI.begin(SD_SPIPINS);   // SCK, MISO, MOSI - as configured
+  #else
+    SDREALSPI.begin();             // HSPI natives
+  #endif
+#endif
+}
+
 bool SDManager::start(){
   ready = begin(SDC_CS, SDREALSPI, SDSPISPEED);
-  vTaskDelay(10);
-  if(!ready) ready = begin(SDC_CS, SDREALSPI, SDSPISPEED);
-  vTaskDelay(10);
-  if(!ready) ready = begin(SDC_CS, SDREALSPI, SDSPISPEED);
+  pinSdSpiPins();
+  if(ready) {
+    // Re-pin, then re-initialise so the card object is built against the right
+    // matrix. begin() is a no-op once mounted, so drop the mount first.
+    stop();
+    ready = begin(SDC_CS, SDREALSPI, SDSPISPEED);
+  }
+  if(!ready) {
+    vTaskDelay(10);
+    if(!ready) ready = begin(SDC_CS, SDREALSPI, SDSPISPEED);
+    pinSdSpiPins();
+    vTaskDelay(10);
+    if(!ready) ready = begin(SDC_CS, SDREALSPI, SDSPISPEED);
+  }
   return ready;
 }
 
