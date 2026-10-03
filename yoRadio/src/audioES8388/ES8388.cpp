@@ -90,8 +90,10 @@ bool ES8388::begin(int sda, int scl, uint32_t frequency)
     res &= write_reg(ES8388_ADDR, ES8388_CHIPPOWER, 0xAA);
     delay(500);
 
-    /* Analog output volume. LOUT1/ROUT1 feed the headphone amp, LOUT2/ROUT2 the
-       on-board speaker amp. 30 == 0dB. */
+    /* Analog output volume. On the ESP32-A1S carrier LOUT1/ROUT1 feed the
+       speaker amps (SPOLP/N -> U4/U5 -> J3/J4, hardware-enabled by GPIO21) and
+       LOUT2/ROUT2 feed the headphone jack (HPOUTL/R -> J2, no hardware enable).
+       30 == 0dB. */
     res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL24, 0x1E); // LOUT1
     res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL25, 0x1E); // ROUT1
     res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL26, 0x1E); // LOUT2

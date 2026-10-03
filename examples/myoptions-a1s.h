@@ -82,8 +82,10 @@
 /* Amplifier enable. On this board MUTE_PIN is the inverted GPIO_PA_EN, and
    the amplifier is active-high, so writing MUTE_VAL means "shut the speaker
    amp up". MUTE_VAL = LOW mutes, HIGH unmutes.
-   OUT1 of the codec feeds the headphone amp, OUT2 feeds the on-board speaker
-   amp, and the same MUTE_PIN gates both on this board. */
+   OUT1 of the codec feeds the speaker amps (SPOLP/N -> U4/U5 -> J3/J4) and
+   OUT2 the headphone jack (HPOUTL/R -> J2). MUTE_PIN gates only the speaker
+   path, through the CTRL pin on U4 and U5; the headphone jack has no hardware
+   enable and can only be muted via ES8388_OUT2_MUTE. */
 #define MUTE_PIN        21   /* = GPIO_PA_EN, amplifier enable */
 #define MUTE_VAL        LOW  /* write this to MUTE_PIN when stopped (i.e. mute) */
 

@@ -108,15 +108,17 @@
    reads, kept solely so sizeof(config_t) and the EEPROM layout stay stable. */
 #define ES8388_MAIN_VOLUME     192     // 0dB, unity
 /* Analog output volume. Registers 46/47 (LOUT1/ROUT1) and 48/49 (LOUT2/ROUT2).
-   0..33 where 30 = 0dB and 33 = +4.5dB, 1.5dB per step, 0 = -45dB.
-   On the ESP32-A1S: OUT1 = on-board speaker amp (SPOLP/N), OUT2 = headphone
-   amp (HPOUTL/R). Values above 33 are clamped. */
-#define ES8388_OUT1_VOLUME     30      // 0dB into the external amp
-#define ES8388_OUT2_VOLUME     30      // 0dB into the speaker amp
+   0..33 where 30 = 0dB and 33 = +4.5dB, 1.5dB steps, 0 = -45dB.
+   On the ESP32-A1S: OUT1 = speaker (SPOLP/N -> U4/U5 -> J3/J4), OUT2 =
+   headphone (HPOUTL/R -> J2). Only the speaker path has a hardware enable
+   (GPIO21 -> R46 -> the amps' CTRL pin); the headphone jack has none, so it
+   can only be muted here. Values above 33 are clamped. */
+#define ES8388_OUT1_VOLUME     30      // 0dB into the speaker amps
+#define ES8388_OUT2_VOLUME     30      // 0dB into the headphone jack
 
 #define ES8388_MAIN_MUTE       false   // digital mute
-#define ES8388_OUT1_MUTE       false   // headphone amp not muted
-#define ES8388_OUT2_MUTE       false   // speaker amp not muted
+#define ES8388_OUT1_MUTE       false   // speaker amp not muted
+#define ES8388_OUT2_MUTE       false   // headphone amp not muted
 
 /* DAC Control 7 (0x1d) */
 #define ES8388_STEREO_EFF      4       // 0..7, 0 = off, 7 = strongest widening

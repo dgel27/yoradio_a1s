@@ -484,15 +484,30 @@ Using them for the encoder means:
   onboard button — but they do share the SD nets, so a fitted SD card would
   contend.
 
-**GPIO 21 as `MUTE_PIN`** goes through **R46** to the amplifier `CTRL` pin. That
-is why the value is active-low (`MUTE_VAL LOW`) and why `myoptions.h` insists on
-a 10 kΩ pull-down: R46 is a 0 Ω link, so at reset the amp-enable pin is
-high-impedance and the amplifier floats, which is the loud burst on reboot.
+**GPIO 21 as `MUTE_PIN`** goes through **R46** to the `CTRL` pin of the two
+**speaker** amplifiers (U4 → J3, U5 → J4), with **R51** as the pull-down. That is
+why the value is active-low (`MUTE_VAL LOW`) and why `myoptions.h` insists on a
+10 kΩ pull-down: R46 is a 0 Ω link, so at reset the amp-enable pin is
+high-impedance and the amplifiers float, which is the loud burst on reboot.
 Leaving the pull-down off means a loud pop every restart.
 
-If you want to free GPIO 21 for something else, remove **R46** — but you also
-give up the clean-reboot mute, and you should then fit a real amplifier
-disable path or accept the noise burst.
+The two outputs are gated by different hardware, which is worth keeping straight:
+
+| Output | Codec side | Hardware enable |
+|---|---|---|
+| Speaker (J3/J4, via U4/U5) | LOUT1/ROUT1, `ES_OUT1` | **GPIO 21** through R46 |
+| Headphone (J2) | LOUT2/ROUT2, `ES_OUT2` | none — no `CTRL` on that path |
+
+So the speaker has a real hardware mute and the headphone jack does not. Two
+consequences: the headphone amp can only be silenced through the codec
+(`es_mute2`, see the jack-detect section), and `hpmutesp` — labelled "Mute
+speaker amp" in the UI — does exactly that and nothing more.
+
+Setting `MUTE_PIN` to 255 disables the pin in firmware and costs 96 bytes, but on
+this board the speakers are the primary output, so it is only worth doing if
+something else takes over the amplifier enable. Freeing the pin outright means
+removing **R46**, which also gives up the clean-reboot mute unless a real
+amplifier disable path is fitted.
 
 ### Freeing the five key GPIOs (remove R66–R70)
 
