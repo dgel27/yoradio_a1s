@@ -77,13 +77,18 @@ bool ES8388::begin(int sda, int scl, uint32_t frequency)
     res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL5, 0x00);
 
     /* Output mixers: LDAC/RDAC to LOUT/ROUT, line-in present but not mixed in.
-       LMIXSEL/RMIXSEL select LIN1/RIN1. The old code used 0x90 (line-in at 0dB)
-       and an accidental 0x1B for the source select.
+       The old code used 0x90 (line-in at 0dB) and an accidental 0x1B for the
+       source select.
        0xB8 = LD2LO=1, LI2LO=0 (off), LI2LOVOL=111 which is -15dB, not the -12dB
        an earlier comment here claimed. It is transient either way:
        Player::applyEs8388Settings() rewrites both mixers immediately afterwards
-       with the stored mode and gain. */
-    res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL16, 0x00); // LMIXSEL=LIN1, RMIXSEL=RIN1
+       with the stored mode and gain.
+       0x09 = LMIXSEL=LIN2, RMIXSEL=RIN2, not the 0x00 (LIN1/RIN1) this used to
+       write. The module's LINEINL/LINEINR pins reach the codec's SECOND line
+       input on the ESP32-A1S; measured, because the carrier schematic treats the
+       module as a black box and cannot show it. With 0x00 the line-in bits were
+       set correctly and the signal still never arrived. */
+    res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL16, 0x09);
     res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL17, 0xB8); // LD2LO=1, line-in off at -15dB
     res &= write_reg(ES8388_ADDR, ES8388_DACCONTROL20, 0xB8); // RD2RO=1, line-in off at -15dB
 
@@ -288,6 +293,12 @@ void ES8388::line_in_mix_mode(const uint8_t mode, const int8_t gain_db)
     uint8_t bits = (uint8_t)(code << 3);
     bool on = mode != LINEIN_OFF;
 
+    // The analog input buffers must be powered for line-in to reach the mixer at
+    // all, and register 3 resets with them switched off. Doing it here rather
+    // than relying on adc_power() is deliberate: adc_power(false) is the normal
+    // playback state and must not be able to turn line-in off behind our back.
+    if (on) analog_input_power(true);
+
     // reg 39: LD2LO(7) LI2LO(6) LI2LOVOL(5:3). Keep LD2LO=1 (DAC always routed).
     uint8_t l = 0;
     l |= (1 << 7);
@@ -330,9 +341,39 @@ void ES8388::mic_bias(const bool on)
 
 void ES8388::adc_power(const bool on)
 {
-    // on: enable analog inputs and both ADCs, no mic bias, int1 in low power
-    // off: everything powered down (playback only)
-    write_reg(ES8388_ADDR, ES8388_ADCPOWER, on ? 0x09 : 0xFF);
+    // Register 3 packs three unrelated things: the analog input buffers (7:6),
+    // the two ADCs (5:4) and the mic bias (3). Only the middle pair is what this
+    // function is named for.
+    //
+    // The old code wrote the whole byte, 0xFF when off, which also set PdnAINL
+    // and PdnAINR - so switching to playback-only power silently powered down the
+    // analog input buffers and killed the line-in path, because line-in reaches
+    // the output mixers THROUGH those buffers and never touches an ADC. That is
+    // why they get their own control now (analog_input_power).
+    if (on) {
+        // Everything on: input buffers and both ADCs up, mic bias off.
+        write_reg(ES8388_ADDR, ES8388_ADCPOWER, 0x09);
+    } else {
+        // Only the ADCs go down. The input buffers are left as they are.
+        rmw(*this, ES8388_ADCPOWER, (3 << 4), (3 << 4));
+    }
+}
+
+/* Register 3 bits 7:6 (PdnAINL/PdnAINR). 0 = normal, and 1 is the reset
+   default, so an untouched part has its line-in path switched off. */
+void ES8388::analog_input_power(const bool on)
+{
+    rmw(*this, ES8388_ADCPOWER, (3 << 6), on ? 0 : (3 << 6));
+}
+
+/* Register 38: LMIXSEL(5:3) and RMIXSEL(2:0), each 000=LIN1/RIN1 (default),
+   001=LIN2/RIN2. Values above 1 are left alone - the datasheet reserves 010 and
+   gives 011/100 as the post-mic-amplifier ADC taps, which are not what a line
+   jack is wired to. */
+void ES8388::line_input_select(const uint8_t sel)
+{
+    uint8_t s = sel > 1 ? 1 : sel;
+    write_reg(ES8388_ADDR, ES8388_DACCONTROL16, (uint8_t)((s << 3) | s));
 }
 
 /**
@@ -355,7 +396,13 @@ void ES8388::wake()
 {
     write_reg(ES8388_ADDR, ES8388_DACCONTROL21, 0x80);
     write_reg(ES8388_ADDR, ES8388_CHIPPOWER, 0x00);
-    write_reg(ES8388_ADDR, ES8388_ADCPOWER, 0x00);
+    /* Register 3 is deliberately not written here. It used to be forced to 0x00,
+       which powers the ADCs back up however the user has es_adc set - the
+       opposite of the playback-only default - and it also undid whatever
+       analog_input_power() had set. standby() parks it at 0xFF, and
+       Player::setOutputPins() calls applyOutputRouting() immediately after this,
+       which restores the input buffers and leaves the ADCs where the stored
+       es_adc setting wants them. */
     write_reg(ES8388_ADDR, ES8388_DACPOWER, 0x3C);
     write_reg(ES8388_ADDR, ES8388_DACCONTROL3, 0xE2);
 }

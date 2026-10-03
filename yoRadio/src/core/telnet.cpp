@@ -220,6 +220,7 @@ void Telnet::printHelp(uint8_t clientId) {
   printf(clientId, "  esinvr on|off           ES8388 invert right channel\n");
   printf(clientId, "  eslinein off|mix|line   ES8388 line-in: off, mixed with radio, or line only\n");
   printf(clientId, "  eslingain <dB>          ES8388 line-in gain -15..+6, in 3dB steps\n");
+  printf(clientId, "  eslinsel <0|1>          line-in pair: 0=LIN1/RIN1 1=LIN2/RIN2 (A1S is 1)\n");
   printf(clientId, "  esadc on|off            ES8388 power up the ADC\n");
   printf(clientId, "  esmicpga <n>            ES8388 mic preamp gain 0-8 (0..+24dB)\n");
   printf(clientId, "  esmicin <n>             ES8388 mic input 0=LIN1 1=LIN2 2=diff\n");
@@ -668,6 +669,15 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   if (strcmp(str, "esinvl off") == 0) { config.saveValue(&E.es_invl,(uint8_t)0); es.channel_invert(false, E.es_invr); printf(clientId, "#ES8388.INVL# normal\n> "); return; }
   if (strcmp(str, "esinvr on") == 0)  { config.saveValue(&E.es_invr,(uint8_t)1); es.channel_invert(E.es_invl, true);  printf(clientId, "#ES8388.INVR# invert R\n> "); return; }
   if (strcmp(str, "esinvr off") == 0) { config.saveValue(&E.es_invr,(uint8_t)0); es.channel_invert(E.es_invl, false); printf(clientId, "#ES8388.INVR# normal\n> "); return; }
+  /* Which line-in pair feeds the mixers. Exposed because it is board-dependent
+     and unmeasurable from the carrier schematic, so a different module or a
+     reworked carrier may need the other one. */
+  if (sscanf(str, "eslinsel %d", &svol) == 1) {
+    if (svol < 0) svol = 0; if (svol > 1) svol = 1;
+    printf(clientId, "#ES8388.LINSEL# line-in pair: %s\n> ", svol ? "LIN2/RIN2" : "LIN1/RIN1");
+    es.line_input_select((uint8_t)svol);
+    return;
+  }
   if (sscanf(str, "eslingain %d", &svol) == 1) {
     if (svol < -15) svol = -15; if (svol > 6) svol = 6;
     // Snap to the register's 3 dB grid so the stored value is what actually

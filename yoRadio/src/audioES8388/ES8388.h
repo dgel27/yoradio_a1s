@@ -138,6 +138,17 @@ public:
     void mic_bias(const bool on);
     /* Power up the ADC and analog inputs (playback only leaves this off) */
     void adc_power(const bool on);
+    /* Power the analog INPUT BUFFERS only (register 3 bits 7:6, PdnAINL/R).
+       Separate from adc_power() because the two are independent: line-in runs
+       through these buffers into the output mixers and never touches the ADCs.
+       Leaving them powered down is what silently makes line-in produce nothing.
+       Register 3's default has both bits SET, i.e. powered down. */
+    void analog_input_power(const bool on);
+    /* Which line-in pair feeds the output mixers (register 38).
+       0 = LIN1/RIN1, 1 = LIN2/RIN2. On the ESP32-A1S the module's
+       LINEINL/LINEINR pins reach LIN2/RIN2 - measured, since the carrier
+       schematic treats the module as a black box. */
+    void line_input_select(const uint8_t sel);
 
     /* Low power / standby, per user guide 11.5 and 11.6 */
     void standby();
