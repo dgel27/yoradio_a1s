@@ -127,7 +127,7 @@ Confidence column:
 | 18 | **R69** | **0 Ω** | KEY5 button + debounce cap | remove R69 | community + schematic |
 | 19 | **R67** | **0 Ω** | KEY3 button + debounce cap (also LED5) | remove R67 | community + schematic |
 | 23 | **R68** | **0 Ω** | KEY4 button + debounce cap | remove R68 | community + schematic |
-| 36 | **R53** | not printed | `KEY_AD` resistor ladder (KEY1–KEY6 as one analog ADC channel) | remove R53 | schematic |
+| 36 | **R53** | **0 Ω** | `KEY_AD` resistor ladder (KEY1–KEY6 as one analog ADC channel) | nothing useful — 36 is input-only | measured + schematic |
 | 21 | **R46** | not printed | speaker-amp `CTRL` / ShutDown — this project's `MUTE_PIN` | remove R46 | schematic |
 | 39 | **R37** | not printed | SD `DATA2` | remove R37 | schematic |
 | 39 | **R36** | not printed | headphone `HP_Detect` | remove R36 | schematic |
@@ -140,7 +140,7 @@ Confidence column:
 | 4 | **R28** | not printed | SD `DATA1` | remove R28 | schematic |
 | 12 | **R23** | not printed | SD `DATA2` net / pull-down | remove R23 | schematic |
 | 15 | **R25** | not printed | SD `CMD` | remove R25 | schematic |
-| 13 | **R58** | not printed | SD `DATA3` | remove R58 | schematic |
+| 13 | **R24** | not printed | SD `DATA3` | remove R24 | schematic |
 
 R67–R70 and R66 are explicitly called out in a community porting note as *"all
 0 Ohms … unsoldered R66, 67, 68, 69, 70 to free these GPIOs from the
@@ -163,7 +163,7 @@ Ai-Thinker's key table (spec, authoritative):
 | KEY6 | 5 | no external pull-up |
 
 All six share one ADC input, `KEY_AD`, through a resistor ladder
-(R55–R59 with R61–R64), so only one of them is high at a time and the ESP32 tells
+(R55–R59 with R60–R64), so only one of them is high at a time and the ESP32 tells
 them apart by voltage. **Consequence: you cannot use two of these keys
 independently.** `KEY_AD` is on GPIO 36, which is input-only.
 
@@ -185,40 +185,119 @@ no output driver, so it is only useful as an ADC input.
 | **R68** | 0 Ω link, IO23 ↔ KEY4 | **0 Ω** | as above |
 | **R69** | 0 Ω link, IO18 ↔ KEY5 | **0 Ω** | as above |
 | **R70** | 0 Ω link, IO5 ↔ KEY6 | **0 Ω** | as above |
-| **R53** | IO36 → `KEY_AD` | not printed | schematic |
-| **R52**, **R54** | `KEY_AD` bias network with C41 | not printed | schematic |
-| **R55–R59** | ladder, VDD3V3 side | not printed | schematic |
-| **R60–R64** | ladder, key side | not printed | schematic |
+| **R53** | IO36 → `KEY_AD` | **0 Ω** | measured |
+| **R52** | VDD3V3 → `KEY_AD` pull-up | **10 kΩ** | measured |
+| **R54** | second series pull-up, VDD3V3 side | **not populated (DNP)** | measured |
+| **C41** | `KEY_AD` → GND filter | not printed | schematic |
+| **R55–R59** | ladder chain, `KEY_AD` side | not printed; see build table | schematic |
+| **R60–R64** | ladder, per-key series | not printed; see build table | schematic |
 | **R36** | HP-detect pull-up to VDD3V3 | not printed | schematic |
 
-Ladder topology, from the schematic: `VDD3V3` biases `KEY_AD` through R52/R54
-with C41 filtering; R55–R59 form the divider chain down to GND; each key switch
-pulls `KEY_AD` to a distinct tap through R60–R64, so the six keys produce six
-different ADC voltages on GPIO 36. Removing R66–R70 disconnects the GPIO from
-its key **and its debounce capacitor** — that is the entire reason a 0 Ω link is
-there at all.
+Ladder topology, verified from the schematic's own net geometry:
+
+```
+VDD3V3 ──R52 10k──┬──R54 DNP── KEY1 ── K3 ── GND
+                 │
+                 ├─ R53 0Ω ── IO36 (GPIO36)
+                 │
+                C41 ── GND
+                 │
+                KEY_AD
+
+KEY_AD ──R55── n1 ──R56── n2 ──R57── n3 ──R58── n4 ──R59── n5
+               │          │          │          │          │
+              R60        R61        R62        R63        R64
+               │          │          │          │          │
+             KEY2       KEY3       KEY4       KEY5       KEY6
+               │          │          │          │          │
+              K4         K5         K6         K7         K8
+               │          │          │          │          │
+              GND        GND        GND        GND        GND
+```
+
+Three points that are easy to get wrong, and which an earlier version of this
+document got wrong:
+
+- The chain R55–R59 runs from `KEY_AD` down to the **KEY6 node**. There is **no
+  GND at the bottom of the chain** — the only path from `n5` to ground is
+  through KEY6 itself.
+- Each switch pulls **its own tap** to GND. Nothing pulls `KEY_AD` down except
+  KEY1.
+- R60–R64 are **in series** with each tap's path to ground, so a key contributes
+  the **pair** `R(5x) + R(6x)`. This is the structure behind the community
+  write-up's "resistor pairs 56/61, 57/62, 58/63, 59/64" — it is describing
+  cumulative steps, not independent dividers.
+
+Consequence: only one key at a time produces a meaningful voltage, and two keys
+pressed together give a single ambiguous reading. GPIO 36 is input-only, which is
+fine for an ADC and is why the ESP32 gives it no output driver.
+
+Removing R66–R70 disconnects each GPIO from its key **and its debounce
+capacitor** — that is the entire reason a 0 Ω link is there at all.
 
 The only resistance value printed anywhere on this schematic
 (`Vo=(Ra/Rb+1)*0.6V=(510k/110k+1)*0.6V=3.38V`) belongs to **R7 beside JP1**,
 the USB-serial 5 V→3.3 V level divider. It is not part of the key circuit and is
 not a key-ladder value.
 
-#### If you rebuild the ladder yourself
+#### How the ladder works
 
-The tap voltages are set by R61–R64, so their values are yours to choose rather
-than copy:
+Let `P = R52 + R54` be the pull-up (10 kΩ on the measured unit, since R54 is
+empty), and let the cumulative series resistance to each tap be:
 
-- Keep the ladder in the tens of kΩ range. Too large and the ADC input
-  impedance of input-only GPIO 36 distorts the reading; too small and you burn
-  current for as long as a key is held.
-- Work each divider backwards from the voltage you want: for a tap with `Ra` to
-  VDD3V3 and `Rb` to GND, `V = VDD3V3 × Rb / (Ra + Rb)`. Leave **≥ ~0.15 V**
-  between adjacent taps so ADC error and noise cannot make two keys ambiguous.
-- KEY1 needs no divider — it reads as a direct low, which is why it still works
-  with R56/R61, R57/R62, R58/R63 and R59/R64 unpopulated.
+```
+S₁ = R55 + R60
+S₂ = S₁ + R56 + R61
+S₃ = S₂ + R57 + R62
+S₄ = S₃ + R58 + R63
+S₅ = S₄ + R59 + R64
+```
 
-**The fitted values are not documented anywhere in this repository.** Measure
-them in circuit, or pick your own with the formula above.
+Then, with a key held, the voltage on GPIO 36 is:
+
+```
+V(KEYn) = 3.3 × Sₙ / (P + Sₙ)
+```
+
+So the levels are set by the **pair sums**, not by any single resistor, and the
+pull-up sets the reference. KEY1 bypasses the ladder entirely: K3 ties `KEY_AD`
+straight to GND, which is why KEY1 keeps working with all of R55–R64 unpopulated.
+
+#### Recommended build values (P = 10 kΩ)
+
+The factory fitted values are not documented anywhere in this repository, so if
+you are building the ladder yourself, fit these. All are standard E24:
+
+| Key | ladder | series | Σ | V on GPIO 36 | band centre |
+|---|---|---|---|---|---|
+| KEY1 | — | — | — | 0.000 V | `< 238 mV` |
+| KEY2 | **R55 = 1k0** | R60 = 1k0 | 2000 | 0.550 V | 275 mV |
+| KEY3 | **R56 = 1k6** | R61 = 1k0 | 4600 | 1.040 V | 795 mV |
+| KEY4 | **R57 = 3k3** | R62 = 1k0 | 8900 | 1.554 V | 1297 mV |
+| KEY5 | **R58 = 6k8** | R63 = 1k0 | 16700 | 2.064 V | 1809 mV |
+| KEY6 | **R59 = 16k** | R64 = 1k0 | 33700 | 2.545 V | 2304 mV |
+
+Why these values:
+
+- **Spacing.** The smallest gap is 0.481 V. ADC1 on GPIO 36 is worst case around
+  ±0.15 V, so even a poor reading cannot be mistaken for a neighbouring key.
+- **ADC source impedance.** The worst case is KEY6, where the ADC sees
+  `P ∥ S₅ = 10 k ∥ 33.7 k = 7.7 kΩ`. That is inside the ~10 kΩ the ESP32 ADC
+  wants; push the ladder much higher and the sample-and-hold cannot settle.
+- **R53 matters.** It is 0 Ω here, so it adds nothing. Any resistor fitted there
+  adds directly to the impedance in the row above — do not populate it.
+- **Leave R54 empty.** It is a second pull-up in series with R52. Fitting it
+  raises `P` and shifts every level in the table above.
+- **Current.** 330 µA through the pull-up at idle, 98 µA extra with KEY6 held.
+  Negligible, which is the cost of the tens-of-kΩ range this design sits in.
+- **R60–R64 are fixed at 1k0 by choice**, not by necessity. They set the step
+  increments; making them small keeps the ladder values readable as E24.
+- **C41** filters the node. Its value is not printed; with 100 nF the settling
+  time against 7.7 kΩ is about 0.8 ms, which suits a debounce window.
+
+If you fit a different pull-up, rescale: keep the ratios
+`R55:R56:R57:R58:R59 ≈ 1 : 1.6 : 3.3 : 6.8 : 16` and re-check the two limits
+above rather than reusing these numbers unchanged.
 
 ### ⚠ yoRadio cannot read these keys
 
@@ -235,6 +314,11 @@ set — no option in `options.h` enables it.
 Remove R66–R70 if you want the pins for an encoder, an I2C bus or SPI, and
 accept the keys going dead. Keep them fitted if you would rather have working
 keys and find the pins elsewhere.
+
+**If you do build the ladder, the band centres in the build table above are the
+thresholds the firmware needs** — 275 / 795 / 1297 / 1809 / 2304 mV, with roughly
+±60 mV of dead-band around each. Those are the values to implement when ADC key
+scanning is added.
 
 ---
 
@@ -340,22 +424,27 @@ pins cannot be decided at runtime — pick them, then rebuild.
 
 ### Candidate pairs
 
-Every one needs at least one 0 Ω removed, since each of these pins currently
-drives an onboard circuit.
+**These assume R66–R70 have already been removed** (see the keys section), so
+13, 18, 19 and 23 are already free. Every pair still needs R14, which is the
+only remaining 0 Ω on a candidate pin.
 
 | SDA + SCL | Remove | Leaves free | Note |
 |---|---|---|---|
-| **22 + 23** | R14, R68 | 5, 18, 19 | best default — see below |
-| 22 + 13 | R14, R66 | 5, 18, 19, 23 | 13 is the most shared pin (DIP switch) |
-| 5 + 18 | R70, R69 | 19, 23, 22 | |
-| 18 + 19 | R69, R67 | 5, 23, 22 | |
-| 23 + 19 | R68, R67 | 5, 18, 22 | |
-| 4 + 22 | R28, R14 | 5, 18, 19, 23 | 4 has the least on-board attachment |
+| **22 + 23** | R14 | 5, 13, 18, 19 | best default — see below |
+| 22 + 13 | R14 | 5, 18, 19, 23 | 13 is the most shared pin (DIP switch) |
+| 5 + 18 | — | 13, 19, 22, 23 | nothing left to desolder |
+| 18 + 19 | — | 5, 13, 22, 23 | nothing left to desolder |
+| 23 + 19 | — | 5, 13, 18, 22 | nothing left to desolder |
+| 4 + 22 | R14, R28 | 5, 13, 18, 19, 23 | 4 has the least on-board attachment |
 
 **22 + 23 is the best default.** GPIO22 is the Arduino-default SCL and has the
 lightest on-board load, and GPIO23 is one of the four VSPI pins — so the pair
-leaves **5, 18, 19** intact, which is exactly the VSPI group
-(SCK=18, MISO=19, MOSI=23, SS=5) for an SPI display if you ever want one.
+leaves **5, 13, 18, 19** intact, which still contains the VSPI group
+(SCK=18, MISO=19, MOSI=23, SS=5) minus 23, so an SPI display would want 18/19/5
+with 23 as the shared I2C pin.
+
+If you have **not** yet removed R66–R70, then each key pin additionally needs its
+own 0 Ω lifted: 23 → R68, 13 → R66, 19 → R67, 18 → R69, 5 → R70.
 
 ### Pins that cannot be used for I2C
 
