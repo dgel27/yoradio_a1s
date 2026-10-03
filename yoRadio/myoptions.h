@@ -47,7 +47,32 @@
 //#define GPIO_PA_EN       21   /* Amplifier GPIO */
 //#define GPIO_PA_LEVEL    HIGH /* Amplifier enable level */
 //#define SD_DETECT        34 // ?
-//#define HP_DETECT        39 // ?
+
+/* Headphone jack detect, GPIO39 via R36 on the carrier.
+ *
+ * Silences the HEADPHONE amplifier only while nothing is plugged in, so the amp
+ * is not driving an empty output. The speaker is left alone on purpose.
+ * Your own headphone-mute setting is still stored while unplugged and comes back
+ * when you plug in.
+ *
+ * HP_DETECT_ACTIVE is the pin level that means "plugged in". LOW, measured on this
+ * board: with nothing plugged in the pin reads HIGH, so the empty jack pulls the
+ * net UP and inserting a plug pulls it down. That is the opposite of what the
+ * schematic implies (R36 looks like a pull-up to VDD3V3 with a normally-closed
+ * contact, which would make attached = HIGH), so trust the measurement over the
+ * drawing. Confirmed with `hp` over telnet across five reads, all stable at 1.
+ *
+ * If you swap the jack or the carrier revision, run `hp` again and flip this back
+ * if `attached` no longer follows the plug. Nothing else needs changing.
+ *
+ * Note GPIO39 is input-only and, like all of GPIO34-39, has no internal pull-up or
+ * pull-down - R36 is the only bias on this net.
+ */
+#define HP_DETECT              39    // jack sense pin; 255 = disabled
+#define HP_DETECT_ACTIVE       LOW   // level meaning "a headphone is plugged in"
+#define HP_DETECT_SAMPLE_MS    50
+#define HP_DETECT_DEBOUNCE_MS  250
+#define HP_AUTOMUTE            true  // silence the headphone amp while unplugged
 /* The MUTE_PIN is inversed GPIO_PA_EN and implemented in YORADIO.
  *
  * HARDWARE NOTE: fit a pull-down resistor (10k is fine) between MUTE_PIN and

@@ -383,14 +383,21 @@ wants for SD CMD or JTAG.
 
 ## 4b. Headphone jack detect (GPIO 39)
 
-The carrier runs the jack's detect contact to **GPIO 39** through **R36**, which
-is fitted as a pull-up to VDD3V3. The jack contact is normally closed, so an
-empty jack pulls the net low and inserting a plug lets the pull-up win:
+The carrier runs the jack's detect contact to **GPIO 39** through **R36**. On the
+board this was measured on, the polarity is the **opposite** of what the schematic
+implies:
 
-| State | Pin | Headphone amp |
+| State | GPIO 39 | Headphone amp |
 |---|---|---|
-| nothing plugged in | LOW | silenced, so the amp is not driving an empty output |
-| headphone plugged in | HIGH | as configured |
+| nothing plugged in | **HIGH** | silenced, so the amp is not driving an empty output |
+| headphone plugged in | **LOW** | as configured |
+
+R36 is fitted such that an empty jack pulls the net *up*, and inserting a plug
+pulls it *down*. Reading the drawing alone gives the reverse — R36 looks like a
+pull-up to VDD3V3 with a normally-closed contact, which would make attached =
+HIGH. **The measurement wins.** Uncorrected, the wrong bit ships as "headphone
+amplifier permanently enabled", which is the exact hiss the feature exists to
+remove.
 
 Two things worth knowing before touching this:
 
@@ -407,7 +414,7 @@ Off by default. In `myoptions.h`:
 
 ```c
 #define HP_DETECT              39    // 255 = disabled
-#define HP_DETECT_ACTIVE       HIGH  // level meaning "plugged in"; LOW if yours is the other way
+#define HP_DETECT_ACTIVE       LOW   // level meaning "plugged in" — see the table above
 #define HP_DETECT_SAMPLE_MS    50
 #define HP_DETECT_DEBOUNCE_MS  250
 #define HP_AUTOMUTE            true  // silence the headphone amp when unplugged
@@ -420,19 +427,19 @@ The user's own headphone-mute setting is still stored while nothing is plugged i
 the jack state only overrides what reaches the codec. Plug headphones back in and
 the saved preference returns, rather than being overwritten by the detection.
 
-### Settling the polarity
+### Settling the polarity on another board
 
-The `HIGH` default above is read from the schematic's net geometry, not measured.
-Confirm it in one step rather than guessing:
+`LOW` is the measured value on the board this was tested on, and `options.h`
+still ships `HIGH` as the default, so **check before you rely on it**:
 
 ```
 hp
 ```
 
 prints the raw pin, which level counts as active, and whether a headphone is
-currently detected. Plug a headphone in and run `hp` again. If `attached` does not
-follow the plug, set `HP_DETECT_ACTIVE` to `LOW` and rebuild — nothing else needs
-changing.
+currently detected. Run it with nothing plugged in: if `attached` is 1, your board
+is the other way round — set `HP_DETECT_ACTIVE` to `HIGH` and rebuild. Nothing
+else needs changing.
 
 ### The setting in the web UI
 

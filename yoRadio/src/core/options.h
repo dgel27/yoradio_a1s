@@ -299,16 +299,21 @@ The connection tables are located here https://github.com/e2002/yoradio#connecti
    jack does not hiss. The speaker path is left alone - this is not a mute for
    the whole radio, only for the output with no load on it.
 
-   On the ESP32-A1S this is GPIO39, reached through R36, which the carrier fits
-   as a pull-up to VDD3V3. Note GPIO39 is input-only AND, like all of GPIO34-39,
-   has no internal pull-up or pull-down: R36 is the only thing biasing it, so
-   pinMode(..., INPUT_PULLUP) would silently do nothing.
+   On the ESP32-A1S this is GPIO39, reached through R36. Note GPIO39 is input-only
+   AND, like all of GPIO34-39, has no internal pull-up or pull-down: R36 is the
+   only thing biasing it, so pinMode(..., INPUT_PULLUP) would silently do nothing.
 
-   HP_DETECT_ACTIVE is the pin level that means "plugged in". The jack's detect
-   contact is normally closed, so an empty jack pulls the net low and inserting a
-   plug lets the pull-up win: attached = HIGH. If your jack measures the other
-   way round, set this to LOW. The `hp` telnet command prints the raw pin so you
-   can settle it in one look instead of guessing. */
+   HP_DETECT_ACTIVE is the pin level that means "plugged in", and the schematic
+   does NOT settle it. R36 looks like a pull-up to VDD3V3 with a normally-closed
+   jack contact, which would make attached = HIGH. Measured on a real board it is
+   the other way round: an empty jack reads HIGH and inserting a plug pulls it
+   LOW, so attached = LOW. Hence HIGH below - the drawing's answer, kept only so
+   the default is still a defined value rather than a guess baked into the logic.
+
+   CHECK IT on your own board before trusting either: run `hp` over telnet with
+   nothing plugged in. attached=1 means your polarity is HIGH and you should set
+   that; attached=0 means LOW. The command prints the raw pin, so this is one
+   look rather than a rebuild-and-hope cycle. */
 #ifndef HP_DETECT
   #define HP_DETECT               255   // 255 = disabled. GPIO39 on the ESP32-A1S
 #endif
