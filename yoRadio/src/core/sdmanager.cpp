@@ -97,8 +97,19 @@ void SDManager::listSD(File &plSDfile, File &plSDindex, const char* dirname, uin
                 listSD(plSDfile, plSDindex, filePath, levels - 1);
             }
         } else {
-            if (_endsWith(strlwr((char*)fn), ".mp3") || _endsWith(fn, ".m4a") || _endsWith(fn, ".aac") ||
-                _endsWith(fn, ".wav") || _endsWith(fn, ".flac")) {
+            /* Listed extensions must match the ones Audio::connecttoFS()
+               actually dispatches on, or the decoders this build enables are
+               unreachable from a card: it accepted .ogg/.vorbis/.opus since the
+               Vorbis and Opus decoders went in, but only five extensions were
+               indexed, so those files were never written to the playlist.
+
+               strlwr() only covers the first test in the original, so a file
+               named SONG.MP3 indexed while SONG.FLAC did not. Lowercasing the
+               name once up front fixes that and is cheaper than repeating it. */
+            strlwr((char*)fn);
+            if (_endsWith(fn, ".mp3") || _endsWith(fn, ".m4a") || _endsWith(fn, ".aac") ||
+                _endsWith(fn, ".wav") || _endsWith(fn, ".flac") || _endsWith(fn, ".ogg") ||
+                _endsWith(fn, ".vorbis") || _endsWith(fn, ".opus")) {
                 pos = plSDfile.position();
                 plSDfile.printf("%s\t%s\t0\n", fn, filePath);
                 plSDindex.write((uint8_t*)&pos, 4);

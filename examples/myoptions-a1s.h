@@ -218,12 +218,33 @@
 
 /* ======================= SD CARD (OPTIONAL) ============================== */
 /*
-   No SD slot on the bare A1S. For an external SD module, set SDC_CS to its chip
-   select. Leaving it at 255 compiles the SD support out, which also stops
-   store.lastSdStation / store.sdsnuffle from occupying EEPROM.
+   The carrier DOES have an on-board microSD socket, and it works in SPI mode with
+   the four pins it already routes. An earlier version of this file claimed there
+   was no SD slot, which was wrong: the card's pin 2 is CD/DAT3 in SD mode and CS
+   in SPI mode, and that net goes to IO13 - so chip select exists, it just carries
+   the SD-mode name on the schematic.
 
-//#define SDC_CS 5
-//#define SD_HSPI  false  // true for the HSPI pins (miso=12, mosi=13, clk=14)
+   The carrier's own pins, SPI mode:
+       card pin 2  CD/DATA3 -> IO13  CS      (R24, behind DIP switch 1)
+       card pin 3  CMD      -> IO15  MOSI    (R25, behind DIP switch 2)
+       card pin 5  CLK      -> IO14  SCK     (R26)
+       card pin 7  DATA0    -> IO2   MISO    (R27)
+   IO12 (DATA2) and IO34 (detect) are unused in SPI mode.
+
+   DIP switch 1 MUST be in the SD position (KEY2 / SD DATA3 / JTAG MTCK). Left on
+   KEY2, KEY2 shorts CS to ground and no card will initialise.
+
+   IO14 and IO15 are also where the encoder sits, so the encoder and the on-board
+   card cannot both be used. Which of the two to give up is a choice; the encoder
+   can move to 18/19/23, which the key ladder frees and which clash with nothing.
+
+//#define SDC_CS        13
+//#define SD_SPIPINS    14, 2, 15   // SCK, MISO, MOSI - note the order
+//#define SD_DETECT     34
+//#define SD_HSPI       false        // true for the HSPI pins (miso=12, mosi=13, clk=14)
+
+   Leaving SDC_CS at 255 compiles the SD support out, which also stops
+   store.lastSdStation / store.sdsnuffle from occupying EEPROM.
 */
 
 

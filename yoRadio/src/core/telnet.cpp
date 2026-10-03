@@ -5,6 +5,9 @@
 #include "player.h"
 #include "network.h"
 #include "telnet.h"
+#if SDC_CS!=255
+  #include "sdmanager.h"
+#endif
 #if ES8388_ENABLE
   #include "../audioES8388/ES8388.h"
 #endif // ES8388_ENABLE
@@ -424,6 +427,36 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
         config.changeMode(mm);
       return;
     }
+    /* SD state, so the card can be checked without the web UI. Prints the pin
+       assignment as well as whether a card answered, because "not found" is
+       ambiguous between no card, a wrong DIP switch and a bad pin choice. */
+    if (strcmp(str, "sd") == 0) {
+      printf(clientId, "#SD# CS=%d SPI(SCK,MISO,MOSI)=%d,%d,%d mode=%s mounted=%d card=%d\n> ",
+             SDC_CS,
+#if defined(SD_SPIPINS)
+             SD_SPIPINS,
+#else
+             -1, -1, -1,
+#endif
+             config.getMode()==PM_SDCARD ? "SD" : "WEB",
+             sdman.ready ? 1 : 0,
+             sdman.cardPresent() ? 1 : 0);
+      return;
+    }
+    #if SD_DETECT!=255
+    /* Card-detect pin. GPIO34 is input-only with no internal pull-up, so it is
+       read as a plain input; R29 is what biases it. A floating reading here means
+       the detect wiring is not present on this board. */
+    if (strcmp(str, "sddetect") == 0) {
+      pinMode(SD_DETECT, INPUT);
+      int lvl = digitalRead(SD_DETECT);
+      printf(clientId, "#SDDETECT# pin %d level=%d active=%s -> card %s\n> ",
+             SD_DETECT, lvl,
+             SD_DETECT_ACTIVE==HIGH ? "HIGH" : "LOW",
+             ((SD_DETECT_ACTIVE==HIGH ? lvl==HIGH : lvl==LOW)) ? "inserted" : "absent");
+      return;
+    }
+    #endif
     #endif
     if (strcmp(str, "sys.tzo") == 0 || strcmp(str, "tzo") == 0) {
       printf(clientId, "##SYS.TZO#: %d:%d\n> ", config.store.tzHour, config.store.tzMin);

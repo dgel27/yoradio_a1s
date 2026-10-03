@@ -65,11 +65,16 @@ void Config::init() {
 #if IR_PIN!=255
     irindex=-1;
 #endif
-#if defined(SD_SPIPINS) || SD_HSPI
-  #if !defined(SD_SPIPINS)
-    SDSPI.begin();
-  #else
-    SDSPI.begin(SD_SPIPINS); // SCK, MISO, MOSI
+#if SDC_CS!=255
+  // SDSPI only exists when the SD stack is compiled in (sdmanager.h is guarded by
+  // SDC_CS!=255). Guarding on SD_SPIPINS alone broke the build for anyone who set
+  // SDC_CS back to 255 but left a custom SD_SPIPINS in myoptions.h.
+  #if defined(SD_SPIPINS) || SD_HSPI
+    #if !defined(SD_SPIPINS)
+      SDSPI.begin();
+    #else
+      SDSPI.begin(SD_SPIPINS); // SCK, MISO, MOSI
+    #endif
   #endif
 #endif
   eepromRead(EEPROM_START, store);

@@ -212,10 +212,29 @@ The connection tables are located here https://github.com/e2002/yoradio#connecti
 
 /*        SDCARD                  */
 #ifndef SDC_CS
-  #define SDC_CS        255  // SDCARD CS pin
+  #define SDC_CS        255  // SDCARD CS pin. 255 compiles the whole SD stack out.
 #endif
+/* Optional: SD_SPIPINS(SCK, MISO, MOSI) to place the three SPI data pins.
+   Deliberately NOT given a default here. Defining it is not merely a pin choice:
+   config.cpp and sdmanager.cpp both test #if defined(SD_SPIPINS), and defining
+   it moves SD off the global SPI object onto a dedicated SDSPI instance. So
+   leaving it undefined keeps the stock behaviour - VSPI on its fixed pins,
+   SCK 18 / MISO 19 / MOSI 23 - and defining it opts into a custom triple.
+
+   Note the argument order is SCK, MISO, MOSI, which is NOT the card's pin order
+   and trips people up when picking pins straight off the schematic.
+
+#ifndef SD_SPIPINS
+  #define SD_SPIPINS    18, 19, 23  // SCK, MISO, MOSI
+#endif */
 #ifndef SD_HSPI
   #define SD_HSPI       false  // use HSPI for SD (miso=12, mosi=13, clk=14) instead of VSPI (by default)
+#endif
+#ifndef SD_DETECT
+  #define SD_DETECT     255   // card-detect input; level that means inserted is SD_DETECT_ACTIVE
+#endif
+#ifndef SD_DETECT_ACTIVE
+  #define SD_DETECT_ACTIVE LOW  // level that means "card inserted"
 #endif
 
 /*        ENCODER                 */

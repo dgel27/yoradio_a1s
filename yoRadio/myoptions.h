@@ -1,9 +1,16 @@
 #ifndef myoptions_h
 #define myoptions_h
 
-#define ENC_BTNR			12  //CLK
-#define ENC_BTNL			14  //DT 
-#define ENC_BTNB			15  //SW 
+/* Rotary encoder: DISABLED while the on-board SD card is in use.
+ *
+ * SD needs IO14 (SCK), IO15 (MOSI), IO2 (MISO) and IO13 (CS). IO14 and IO15 are
+ * what the encoder sits on here, and neither has a DIP escape, so the two cannot
+ * coexist. Set any of these back to a pin once you are done with SD - the
+ * alternatives that clash with nothing are 18/19/23, which the key ladder frees.
+ */
+#define ENC_BTNR			255  //CLK  -- 12, taken by SD
+#define ENC_BTNL			255  //DT   -- 14, taken by SD
+#define ENC_BTNB			255  //SW   -- 15, taken by SD
 //#define ENC_INTERNALPULLUP	false
 //#define ENC_HALFQUARD		true
 //#define LED_BUILTIN			2
@@ -43,10 +50,37 @@
 #define ES8388_SCL    32
 #define ES8388_SDA    33
 
+/* On-board microSD socket, SPI mode.
+ *
+ * The card's pin 2 is CD/DAT3 in SD mode and CS in SPI mode, and the carrier
+ * routes that net to IO13 - so CS exists after all; it just carries the SD-mode
+ * name on the schematic. All four SPI signals are already on the carrier:
+ *
+ *     card pin 2   CD/DAT3  -> IO13   CS      (via R24, behind DIP switch 1)
+ *     card pin 3   CMD      -> IO15   MOSI    (via R25, behind DIP switch 2)
+ *     card pin 5   CLK      -> IO14   SCK     (via R26)
+ *     card pin 7   DATA0    -> IO2    MISO    (via R27)
+ *
+ * IO12 (DATA2) and IO34 (card detect) are not needed in SPI mode.
+ *
+ * REQUIRED: DIP switch 1 must be in the SD position (KEY2 / SD DATA3 / JTAG
+ * MTCK). Left on KEY2, pressing KEY2 shorts CS to ground and the card will not
+ * initialise. The keys themselves are on the GPIO36 ladder now, so nothing else
+ * is lost by moving the switch.
+ *
+ * SPI, not SDMMC: the Arduino ESP32 SD library this builds against is SPI-only
+ * (FatFs over SPIClass), so there is no faster interface available without
+ * replacing the filesystem layer. At 20MHz that is roughly 120x what a 128kbps
+ * MP3 stream needs, so it is not worth doing.
+ */
+#define SDC_CS        13     // card pin 2, CD/DAT3 = CS in SPI mode
+#define SD_SPIPINS    14, 2, 15   // SCK=IO14, MISO=IO2, MOSI=IO15
+#define SD_DETECT     34     // card-detect switch, via R29
+#define SD_DETECT_ACTIVE LOW  // level that means a card is inserted
+
 /* Amplifier enable PIN - eternal AMP on ESP32-A1S Kit */
 //#define GPIO_PA_EN       21   /* Amplifier GPIO */
 //#define GPIO_PA_LEVEL    HIGH /* Amplifier enable level */
-//#define SD_DETECT        34 // ?
 
 /* Headphone jack detect, GPIO39 via R36 on the carrier.
  *

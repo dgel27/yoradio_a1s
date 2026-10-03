@@ -522,27 +522,82 @@ codec standby is skipped for the same reason. With line-in off nothing changes.
 
 ---
 
+## 4d. On-board microSD in SPI mode
+
+The carrier has a microSD socket (SD1) and it **works in SPI mode with the four
+pins already routed there**. An earlier revision of this document claimed the
+socket had no chip select, which was wrong: the card's pin 2 is `CD/DAT3` in SD
+mode and **CS in SPI mode**, and the carrier routes that net to IO13. The
+schematic just names it after its SD-mode identity.
+
+| Card pin | Socket label | Carrier net | GPIO | SPI role | Gate |
+|---|---|---|---|---|---|
+| 2 | CD/DATA3 | SD_DATA3 | **13** | **CS** | R24, behind DIP switch 1 |
+| 3 | CMD | SD_CMD | **15** | **MOSI** | R25, behind DIP switch 2 |
+| 5 | CLK | SD_CLK | **14** | **SCK** | R26 |
+| 7 | DATA0 | SD_DATA0 | **2** | **MISO** | R27 |
+| 1 | DATA2 | SD_DATA2 | 12 | unused in 1-bit SPI | R23 |
+| 9 | detect | SD_Detect | 34 | card detect | R29 + R18 |
+
+Four GPIOs, all on the carrier: **CS 13, MOSI 15, SCK 14, MISO 2**.
+
+```c
+#define SDC_CS        13
+#define SD_SPIPINS    14, 2, 15   // SCK, MISO, MOSI - note the order
+```
+
+**DIP switch 1 must be in the SD position** (`KEY2 ↔ SD DATA3 ↔ JTAG MTCK`). Left
+on KEY2, pressing KEY2 shorts CS to ground and no card initialises.
+
+**Cost: the encoder.** IO14 and IO15 are where the encoder sits and neither has a
+DIP escape, so the encoder and the on-board card cannot coexist. Move the encoder
+to **18/19/23** to have both — those pins are freed by the key ladder and clash
+with nothing. The keys only shared IO13, and the DIP switch settles that.
+
+**SPI, not SDMMC.** The Arduino ESP32 `SD` library this builds against is
+SPI-only (FatFs over `SPIClass`), so there is no faster interface available
+without replacing the filesystem layer underneath `sdmanager`/`player`. At the
+default 20 MHz that is roughly **120x what a 128 kbps MP3 stream needs**, so the
+ceiling is not worth a rewrite. Pushing past 20 MHz tends to produce CRC errors on
+cheap cards.
+
+From telnet, with no card inserted:
+
+```
+sd         # CS, the pin triple, current mode, mounted, card present
+sddetect   # the card-detect pin level, and what that means
+```
+
+---
+
 ## 5. What this means for this build
 
 `yoRadio/myoptions.h` currently uses:
 
 ```c
-ENC_BTNR  12   // encoder CLK
-ENC_BTNL  14   // encoder DT
-ENC_BTNB  15   // encoder SW
 MUTE_PIN  21   // speaker amp mute
+SDC_CS    13   // microSD chip select (card pin 2, CD/DAT3 in SPI mode)
+SD_SPIPINS  14, 2, 15   // SD SCK, MISO, MOSI
 ```
 
-**GPIO 12, 14 and 15 are SD-card lines on the carrier** (`DATA2`, `CLK`, `CMD`).
-Using them for the encoder means:
+The encoder is currently **disabled**, because the on-board microSD is in use and
+the two need the same pins. See section 4d for the SD pinout.
 
-- the SD socket cannot be used, which is why `SDC_CS` stays `255` and `USE_SD` is
-  never defined — this is not an oversight, it follows from the pin choices;
+**GPIO 12, 14 and 15 are SD-card lines on the carrier** (`DATA2`, `CLK`, `CMD`).
+Putting an encoder on them costs you the on-board card:
+
+- with the encoder on 12/14/15 the SD socket cannot be used, so `SDC_CS` has to
+  stay `255` and `USE_SD` never gets defined;
 - GPIO 15 should be in the **JTAG MTDO** position on the DIP switch, otherwise
   the carrier may still be driving SD CMD;
 - the encoder needs no resistors removed, because none of 12/14/15 feeds an
   onboard button — but they do share the SD nets, so a fitted SD card would
   contend.
+
+**You do not have to choose.** Moving the encoder to **18/19/23** lets the card and
+the encoder coexist; those pins are freed by the key ladder and carry nothing else.
+That is the way to have both, and it costs only a config change plus removing the
+three 0 Ω links (R69/R67/R68) that gate those pins to KEY5/KEY3/KEY4.
 
 **GPIO 21 as `MUTE_PIN`** goes through **R46** to the `CTRL` pin of the two
 **speaker** amplifiers (U4 → J3, U5 → J4), with **R51** as the pull-down. That is
