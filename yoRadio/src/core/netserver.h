@@ -34,7 +34,11 @@ enum requestType_e : uint8_t
                         GETPLAYERMODE=26,
                         CHANGEMODE=27,
                         GETES8388=28,
-                        GETMQTT=29 };
+                        GETMQTT=29,
+                        /* Headphone-jack presence only. Separate from GETES8388
+                           so the settings page can poll it without re-applying
+                           every slider value on each tick. */
+                        GETHP=30 };
                         
 enum import_e      : uint8_t  { IMDONE=0, IMPL=1, IMWIFI=2 };
 

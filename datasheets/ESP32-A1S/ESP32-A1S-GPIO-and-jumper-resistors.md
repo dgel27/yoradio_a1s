@@ -381,6 +381,80 @@ wants for SD CMD or JTAG.
 
 ---
 
+## 4b. Headphone jack detect (GPIO 39)
+
+The carrier runs the jack's detect contact to **GPIO 39** through **R36**, which
+is fitted as a pull-up to VDD3V3. The jack contact is normally closed, so an
+empty jack pulls the net low and inserting a plug lets the pull-up win:
+
+| State | Pin | Headphone amp |
+|---|---|---|
+| nothing plugged in | LOW | silenced, so the amp is not driving an empty output |
+| headphone plugged in | HIGH | as configured |
+
+Two things worth knowing before touching this:
+
+- **GPIO 39 is input-only and has no internal pull-up or pull-down.** That is
+  true of all of GPIO 34–39. R36 is the only thing biasing the net, so
+  `pinMode(39, INPUT_PULLUP)` would silently do nothing.
+- **R36's value is not printed on the schematic.** It does not affect which level
+  counts as "plugged in" — only how twitchy the reading is. If detection proves
+  unreliable, raise `HP_DETECT_DEBOUNCE_MS` rather than changing the resistor.
+
+### Firmware support
+
+Off by default. In `myoptions.h`:
+
+```c
+#define HP_DETECT              39    // 255 = disabled
+#define HP_DETECT_ACTIVE       HIGH  // level meaning "plugged in"; LOW if yours is the other way
+#define HP_DETECT_SAMPLE_MS    50
+#define HP_DETECT_DEBOUNCE_MS  250
+#define HP_AUTOMUTE            true  // silence the headphone amp when unplugged
+```
+
+**This only mutes the headphone amplifier.** The speaker path is deliberately left
+alone — an empty headphone jack should not silence the radio.
+
+The user's own headphone-mute setting is still stored while nothing is plugged in;
+the jack state only overrides what reaches the codec. Plug headphones back in and
+the saved preference returns, rather than being overwritten by the detection.
+
+### Settling the polarity
+
+The `HIGH` default above is read from the schematic's net geometry, not measured.
+Confirm it in one step rather than guessing:
+
+```
+hp
+```
+
+prints the raw pin, which level counts as active, and whether a headphone is
+currently detected. Plug a headphone in and run `hp` again. If `attached` does not
+follow the plug, set `HP_DETECT_ACTIVE` to `LOW` and rebuild — nothing else needs
+changing.
+
+### The setting in the web UI
+
+`settings.html` has a **Mute headphone amp** checkbox (`esmute2`), plus the
+existing headphone volume and balance sliders. All three are greyed out while
+nothing is plugged in, with "no headphone detected" shown next to the checkbox.
+The state refreshes on its own every 2 s, so plugging headphones in re-enables
+them without a reload.
+
+Note this reuses `es_mute2`, which already existed in `config_t` and was applied at
+boot but had no user control anywhere — so there is no config version bump and
+nothing changes for a board that leaves `HP_DETECT` at 255.
+
+From telnet:
+
+```
+hp                 # raw pin, active level, detected state, forced mute
+esmute2 <0|1>      # stored headphone mute; overridden while unplugged
+```
+
+---
+
 ## 5. What this means for this build
 
 `yoRadio/myoptions.h` currently uses:

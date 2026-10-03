@@ -70,6 +70,13 @@ void loop() {
     player.loop();
     //loopControls();
   }
+#if HP_DETECT!=255
+  // Unguarded on purpose. loopControls() bails out during a display update and
+  // Player::loop() only runs when the network is up, so polling the headphone
+  // jack from either of those would stop detecting exactly when it matters -
+  // pulling headphones out during an OTA update, or with the radio in AP mode.
+  player.pollHeadphoneDetect();
+#endif
   loopControls();
   netserver.loop();
 }

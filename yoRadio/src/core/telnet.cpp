@@ -228,6 +228,10 @@ void Telnet::printHelp(uint8_t clientId) {
   printf(clientId, "  esreset                 ES8388 settings back to defaults\n");
   printf(clientId, "  esmono on|off           ES8388 mono/stereo\n");
   printf(clientId, "  esspk mute|unmute       ES8388 speaker amp mute\n");
+  printf(clientId, "  esmute2 <0|1>           ES8388 headphone amp mute (overridden while unplugged)\n");
+  #if HP_DETECT!=255
+  printf(clientId, "  hp                     headphone jack state, raw pin level and forced mute\n");
+  #endif
   printf(clientId, "  esregr <reg> | esregw <reg> <val> | esdump   register debug\n");
   #endif
   #ifdef MQTT_ROOT_TOPIC
@@ -674,6 +678,37 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   if (strcmp(str, "esstandby off") == 0){ config.saveValue(&E.es_standby,(uint8_t)0); player.setEs8388Standby(false); printf(clientId, "#ES8388.STANDBY# off (codec stays awake)\n> "); return; }
   if (strcmp(str, "esspk mute") == 0)  { config.setSpeakerMute(true);  player.setSpeakerMute(true);  printf(clientId, "#ES8388.SPK# muted\n> "); return; }
   if (strcmp(str, "esspk unmute") == 0){ config.setSpeakerMute(false); player.setSpeakerMute(false); printf(clientId, "#ES8388.SPK# unmuted\n> "); return; }
+  if (sscanf(str, "esmute2 %d", &svol) == 1) {
+    // Saved, then pushed through applyOutputMutes() rather than es.mute(), so
+    // the jack-detect override stays the arbiter of what reaches the chip.
+    config.saveValue(&E.es_mute2, (uint8_t)(svol!=0));
+    player.applyOutputMutes();
+    printf(clientId, "#ES8388.MUTE2# headphone amp mute stored: %d%s\n> ",
+           svol!=0 ? 1 : 0,
+#if HP_DETECT!=255
+           player.headphoneForcedMute() ? " (overridden now: no headphone detected)" : ""
+#else
+           ""
+#endif
+    );
+    return;
+  }
+  /* Report the jack, so HP_DETECT_ACTIVE can be settled by looking rather than
+     guessing: plug a headphone in, run `hp` again, and if "attached" does not
+     follow, the level is the other way round and HP_DETECT_ACTIVE should be
+     flipped in myoptions.h. */
+  if (strcmp(str, "hp") == 0) {
+#if HP_DETECT!=255
+    int raw = digitalRead(HP_DETECT);
+    printf(clientId, "#HP# pin %d raw=%d active=%s | attached=%d forced_mute=%d | es_mute2 stored=%d\n> ",
+           HP_DETECT, raw, HP_DETECT_ACTIVE == HIGH ? "HIGH" : "LOW",
+           player.headphoneAttached() ? 1 : 0, player.headphoneForcedMute() ? 1 : 0,
+           (int)E.es_mute2);
+#else
+    printf(clientId, "#HP# HP_DETECT is 255 - jack sense not fitted\n> ");
+#endif
+    return;
+  }
   if (strcmp(str, "esreset") == 0) {
       config.setEs8388Defaults();
       player.applyEs8388Settings();

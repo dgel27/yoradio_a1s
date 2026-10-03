@@ -360,12 +360,36 @@ void NetServer::processQueue(){
           // esmv is the MAIN-PAGE volume (0..254), not the old es_master_vol:
           // the master register is now driven by that slider, so reporting it
           // keeps the settings page showing the level actually in effect.
-          sprintf (wsbuf, "{\"esmv\":%d,\"esv1\":%d,\"esb1\":%d,\"esv2\":%d,\"esb2\":%d,\"esse\":%d,\"esmu\":%d,\"esvpp\":%d,\"esde\":%d,\"esmo\":%d,\"esra\":%d,\"esvr\":%d,\"esli\":%d,\"esad\":%d,\"espg\":%d,\"esmi\":%d,\"esmb\":%d,\"essb\":%d}",
+          sprintf (wsbuf, "{\"esmv\":%d,\"esv1\":%d,\"esb1\":%d,\"esv2\":%d,\"esb2\":%d,\"esse\":%d,\"esmu\":%d,\"esmu2\":%d,\"esvpp\":%d,\"esde\":%d,\"esmo\":%d,\"esra\":%d,\"esvr\":%d,\"esli\":%d,\"esad\":%d,\"espg\":%d,\"esmi\":%d,\"esmb\":%d,\"essb\":%d}",
                                   config.store.volume, e.es_vol1, (int)e.es_bal1, e.es_vol2, (int)e.es_bal2,
-                                  e.es_stereo_eff, config.store.spmute, e.es_vpp, e.es_deemph,
+                                  e.es_stereo_eff, config.store.spmute, e.es_mute2, e.es_vpp, e.es_deemph,
                                   e.es_mono, e.es_soft_ramp, e.es_vroi, e.es_linein, e.es_adc,
                                   e.es_mic_pga, e.es_mic_sel, e.es_mic_bias, e.es_standby);
         }
+#endif
+                                  break;
+      /* Jack state on its own, so the settings page can poll for it without
+         re-reading the whole ES8388 block. That distinction matters: a full
+         reply re-applies every slider value, which would yank esvol2 out from
+         under the user if they were dragging it at the time. This one field only
+         ever drives the greyed-out state. */
+      case GETHP:
+#if ES8388_ENABLE
+        {
+          int attached = 1;
+          int forced = 0;
+#if HP_DETECT!=255
+          attached = player.headphoneAttached() ? 1 : 0;
+          forced = player.headphoneForcedMute() ? 1 : 0;
+#else
+          // No jack sense fitted. Report "attached" so the headphone controls
+          // stay usable rather than greying out settings that do work.
+          forced = 0;
+#endif
+          snprintf (wsbuf, 40, "{\"esatt\":%d,\"esfor\":%d}", attached, forced);
+        }
+#else
+        snprintf (wsbuf, 40, "{\"esatt\":1,\"esfor\":0}");
 #endif
                                   break;
       case GETMQTT:      snprintf (wsbuf, 250, "{\"mqhost\":\"%s\",\"mqport\":%d,\"mqtopic\":\"%s\",\"mquser\":\"%s\",\"mqpass\":\"%s\",\"mqen\":%d}",
@@ -464,6 +488,7 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
       if (strcmp(cmd, "getweather") == 0  ) { requestOnChange(GETWEATHER, clientId);  return; }
       if (strcmp(cmd, "getes8388") == 0  ) { requestOnChange(GETES8388, clientId);  return; }
       if (strcmp(cmd, "getmqtt") == 0    ) { requestOnChange(GETMQTT, clientId);    return; }
+      if (strcmp(cmd, "gethp") == 0      ) { requestOnChange(GETHP, clientId);      return; }
       if (strcmp(cmd, "getactive") == 0   ) { requestOnChange(GETACTIVE, clientId);   return; }
       if (strcmp(cmd, "newmode") == 0     ) { newConfigMode = atoi(val); requestOnChange(CHANGEMODE, 0); return; }
       if (strcmp(cmd, "smartstart") == 0) {
@@ -694,6 +719,13 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
       if (strcmp(cmd, "esmicin") == 0)  { if(u8>2)u8=2; config.saveValue(&E.es_mic_sel, u8); es.mic_input(u8); return; }
       if (strcmp(cmd, "esmicbias") == 0){ config.saveValue(&E.es_mic_bias, (uint8_t)(u8!=0)); es.mic_bias(u8!=0); return; }
       if (strcmp(cmd, "esstandby") == 0) { config.saveValue(&E.es_standby, (uint8_t)(u8!=0)); player.setEs8388Standby(u8!=0); return; }
+      /* Headphone amp mute. Deliberately NOT routed through es.mute() here:
+         Player::applyOutputMutes() owns that write so it can fold in the
+         jack-detect override. Saving the field while nothing is plugged in is
+         allowed and useful - it just does not reach the chip until a headphone
+         is plugged back in, which is what the greyed-out checkbox is telling
+         the user. */
+      if (strcmp(cmd, "esmute2") == 0)  { config.saveValue(&E.es_mute2, (uint8_t)(iv!=0)); player.applyOutputMutes(); return; }
 
       if (strcmp(cmd, "hpmutesp") == 0) {
         config.setSpeakerMute(iv != 0);

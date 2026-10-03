@@ -118,7 +118,29 @@ class Player: public Audio {
     void stepVolumeBy(int steps);
     /* Park/wake the codec with playback; also flips the persisted flag. */
     void setEs8388Standby(bool on);
+    /* The three codec output mutes, with the headphone-jack override folded in.
+       Every path that can change an output enable goes through here: the
+       settings apply, every es.wake(), and the jack-detect handler. Writing
+       es.mute() directly anywhere else is how the forced mute gets undone -
+       es.wake() rewrites DACPOWER to 0x3C, which re-enables BOTH outputs. */
+    void applyOutputMutes();
+    /* Recompute _hpForced from the debounced jack state and push the result.
+       Called on every detected transition and whenever the user's own es_mute2
+       changes underneath us. */
+    void applyHeadphoneRouting();
     #endif
+#if HP_DETECT!=255
+    /* Poll the headphone jack. Called unguarded from loop() rather than from
+       loopControls()/Player::loop(), both of which stop running during a display
+       update or when the network is down - detection has to keep working then,
+       or pulling headphones out during an OTA update would leave the amp open.
+       Cheap: one digitalRead every HP_DETECT_SAMPLE_MS. */
+    void pollHeadphoneDetect();
+    bool headphoneAttached() const { return _hpPresent; }
+    /* True while the headphone amp is being silenced because nothing is
+       plugged in, as opposed to the user's own mute preference. */
+    bool headphoneForcedMute() const { return _hpForced; }
+#endif
     /* Mute the amp and silence the codec ahead of a restart. Call this
        immediately before ESP.restart() so the speaker is shut down before the
        CPU stops, instead of floating until the next boot drives the pin.
@@ -133,6 +155,13 @@ class Player: public Audio {
 #if ES8388_ENABLE
     bool es_standby_wanted = false; // mirror of config.store.es8388.es_standby
     bool es_sleeping = false;       // true while the codec is in standby
+#endif
+#if HP_DETECT!=255
+    bool _hpPresent = false;   // debounced: a headphone is plugged in
+    bool _hpRaw = false;       // last raw sample, before debouncing
+    bool _hpForced = false;    // muting the headphone amp because _hpPresent is false
+    unsigned long _hpSampleAt = 0;
+    unsigned long _hpChangedAt = 0;
 #endif
 };
 

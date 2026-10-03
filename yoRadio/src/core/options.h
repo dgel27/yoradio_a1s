@@ -294,6 +294,37 @@ The connection tables are located here https://github.com/e2002/yoradio#connecti
   #define KEYS_ADC_SAMPLE_MS     10    // sample period; keeps OneButton debounce stable
 #endif
 
+/*        HEADPHONE DETECT           */
+/* Silences the headphone amplifier while nothing is plugged in, so an empty
+   jack does not hiss. The speaker path is left alone - this is not a mute for
+   the whole radio, only for the output with no load on it.
+
+   On the ESP32-A1S this is GPIO39, reached through R36, which the carrier fits
+   as a pull-up to VDD3V3. Note GPIO39 is input-only AND, like all of GPIO34-39,
+   has no internal pull-up or pull-down: R36 is the only thing biasing it, so
+   pinMode(..., INPUT_PULLUP) would silently do nothing.
+
+   HP_DETECT_ACTIVE is the pin level that means "plugged in". The jack's detect
+   contact is normally closed, so an empty jack pulls the net low and inserting a
+   plug lets the pull-up win: attached = HIGH. If your jack measures the other
+   way round, set this to LOW. The `hp` telnet command prints the raw pin so you
+   can settle it in one look instead of guessing. */
+#ifndef HP_DETECT
+  #define HP_DETECT               255   // 255 = disabled. GPIO39 on the ESP32-A1S
+#endif
+#ifndef HP_DETECT_ACTIVE
+  #define HP_DETECT_ACTIVE        HIGH  // level that means a headphone is plugged in
+#endif
+#ifndef HP_DETECT_SAMPLE_MS
+  #define HP_DETECT_SAMPLE_MS     50    // pin poll period
+#endif
+#ifndef HP_DETECT_DEBOUNCE_MS
+  #define HP_DETECT_DEBOUNCE_MS    250   // level must hold this long to count
+#endif
+#ifndef HP_AUTOMUTE
+  #define HP_AUTOMUTE              true  // silence the headphone amp when unplugged
+#endif
+
 /*        TOUCH SCREEN            */
 #define TS_MODEL_UNDEFINED      0
 #define TS_MODEL_XPT2046        1

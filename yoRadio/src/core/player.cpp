@@ -74,6 +74,17 @@ void Player::init() {
 
   // Apply the persisted runtime settings (seeded from myoptions.h on reset)
   es_sleeping = false;
+#if HP_DETECT!=255
+  // Read the jack before the first applyEs8388Settings() so a radio that boots
+  // with nothing plugged in is already silent rather than hissing through the
+  // first poll interval. Debouncing is bypassed on purpose here - we want the
+  // state we are booting into, not a settled reading, and there is no user
+  // action in flight yet to protect against.
+  pinMode(HP_DETECT, INPUT);
+  _hpRaw = digitalRead(HP_DETECT) == HP_DETECT_ACTIVE;
+  _hpPresent = _hpRaw;
+  _hpForced = HP_AUTOMUTE && !_hpPresent;
+#endif
   applyEs8388Settings();
 
   //-------- for Audio Kit 2.3 A247 with ES8388 codec
@@ -176,9 +187,7 @@ void Player::applyEs8388Settings()
     // EEPROM layout stay stable; it is no longer a user setting.
     setEs8388Out(ES8388::ES_OUT1, e.es_vol1, e.es_bal1);
     setEs8388Out(ES8388::ES_OUT2, e.es_vol2, e.es_bal2);
-    es.mute(ES8388::ES_MAIN, e.es_mute_main);
-    es.mute(ES8388::ES_OUT1, e.es_mute1);
-    es.mute(ES8388::ES_OUT2, e.es_mute2);
+    applyOutputMutes();
 
     // DAC Control 7 (0x1d): stereo enhancement, mono, Vpp scale
     es.stereo_eff(e.es_stereo_eff > 7 ? 7 : e.es_stereo_eff);
@@ -207,6 +216,70 @@ void Player::applyEs8388Settings()
     es.mic_bias(e.es_mic_bias);
     es.adc_power(e.es_adc);
 }
+
+/* The single place an analog output enable is written.
+   applyEs8388Settings() pulls the three mutes out into here so that
+   applyOutputMutes() can re-apply them after an es.wake(): standby/wake rewrites
+   DACPOWER to 0x3C, which sets the OUT1 and OUT2 enable bits together, so a
+   headphone mute applied before a wake would silently come back on with it. */
+void Player::applyOutputMutes()
+{
+    es8388_t &e = config.store.es8388;
+    es.mute(ES8388::ES_MAIN, e.es_mute_main);
+    es.mute(ES8388::ES_OUT1, e.es_mute1);
+    // The headphone amp is additionally silenced while the jack reads empty, so
+    // an unplugged output is not left driving an amplifier with nothing on it.
+    // The user's own es_mute2 is still stored either way - this only overrides
+    // what reaches the chip, so plugging headphones back in restores whatever
+    // preference was saved rather than overwriting it.
+    bool hpSilent = false;
+#if HP_DETECT!=255
+    hpSilent = _hpForced;
+#endif
+    es.mute(ES8388::ES_OUT2, e.es_mute2 != 0 || hpSilent);
+}
+
+/* Recompute the forced flag from the current jack state and push it out. Called
+   on every debounced transition; safe to call when nothing changed. */
+void Player::applyHeadphoneRouting()
+{
+#if HP_DETECT!=255
+    bool wantForced = HP_AUTOMUTE && !_hpPresent;
+    if (wantForced != _hpForced) {
+        _hpForced = wantForced;
+        log_i("headphone %s -> %s", _hpPresent ? "attached" : "unplugged",
+              _hpForced ? "headphone amp silenced" : "headphone amp as configured");
+    }
+#endif
+    applyOutputMutes();
+}
+
+#if HP_DETECT!=255
+/* Sample the jack pin and debounce it into _hpPresent.
+   The debounce is on the level holding steady rather than on a minimum press
+   length: plugging a headphone in makes the contact bounce for a few ms, and
+   without this the amp would blip on and off with each bounce. */
+void Player::pollHeadphoneDetect()
+{
+    unsigned long now = millis();
+    if (now - _hpSampleAt < HP_DETECT_SAMPLE_MS) return;
+    _hpSampleAt = now;
+
+    // GPIO39 is input-only and, like the rest of GPIO34-39, has no internal
+    // pull-up or pull-down - the carrier's R36 is the only bias on this net. So
+    // this is a plain INPUT, and INPUT_PULLUP would silently do nothing.
+    bool level = digitalRead(HP_DETECT) == HP_DETECT_ACTIVE;
+    if (level != _hpRaw) {
+        _hpRaw = level;
+        _hpChangedAt = now;
+        return;                       // first sighting of a new level, not yet stable
+    }
+    if (level == _hpPresent) return;  // settled and already applied
+    if (now - _hpChangedAt < HP_DETECT_DEBOUNCE_MS) return;
+    _hpPresent = level;
+    applyHeadphoneRouting();
+}
+#endif // HP_DETECT!=255
 
 /* user volume (0..254) -> ES8388::volume() argument (0..192).
 
@@ -502,7 +575,13 @@ void Player::setOutputPins(bool isPlaying) {
   // again before the first sample of playback. Driven by the persisted
   // es_standby flag so the user can toggle it without reflashing.
   if (es_standby_wanted) {
-    if (isPlaying && es_sleeping) es.wake();
+    if (isPlaying && es_sleeping) {
+      es.wake();
+      // wake() rewrites DACPOWER to 0x3C and re-enables both analog outputs, so
+      // the headphone mute has to be put back on top or a jack-detected unplug
+      // would be undone every time playback resumed.
+      applyOutputMutes();
+    }
     else if (!isPlaying && !es_sleeping) es.standby();
     es_sleeping = !isPlaying;
   }
