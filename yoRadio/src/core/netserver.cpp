@@ -725,6 +725,10 @@ void NetServer::onWsMessage(void *arg, uint8_t *data, size_t len, uint8_t client
         if (u8 > 2) u8 = 2;
         config.saveValue(&E.es_linein, u8);
         player.applyOutputRouting();
+        // Routing line-in changes whether the amplifier should be live even with
+        // nothing playing, so re-evaluate MUTE_PIN now rather than at the next
+        // play - otherwise enabling line-in while stopped appears to do nothing.
+        player.refreshOutputPins();
         return;
       }
       if (strcmp(cmd, "eslingain") == 0) {

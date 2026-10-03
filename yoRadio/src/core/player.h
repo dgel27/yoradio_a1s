@@ -80,6 +80,11 @@ class Player: public Audio {
     /* User-controlled speaker/amp mute, OR'd into setOutputPins() */
     void setSpeakerMute(bool muted);
     bool speakerMute() const { return _spmute; }
+    /* Re-evaluate MUTE_PIN against the current playback state. Needed after
+       anything that changes whether an output should be live rather than when
+       playback starts or stops - changing the line-in mode while stopped, for
+       instance, or the amplifier would stay off until the next play. */
+    void refreshOutputPins();
     #if ES8388_ENABLE
     /* Push the persisted ES8388 settings to the codec. */
     void applyEs8388Settings();
@@ -116,6 +121,8 @@ class Player: public Audio {
        0.5 dB step; a step in the 0..254 user domain can round to the same
        register and appear dead. */
     void stepVolumeBy(int steps);
+    /* True when line-in is routed to the outputs (mix or line-only). */
+    bool lineInRouted() const;
     /* Park/wake the codec with playback; also flips the persisted flag. */
     void setEs8388Standby(bool on);
     /* Output routing: the three codec output mutes and the line-in mixers, with

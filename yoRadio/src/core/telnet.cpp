@@ -679,9 +679,9 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   if (strcmp(str, "esramp off") == 0)  { config.saveValue(&E.es_soft_ramp,(uint8_t)0); es.volume_ramp(0); printf(clientId, "#ES8388.RAMP# off\n> "); return; }
   if (strcmp(str, "esvroi on") == 0)   { config.saveValue(&E.es_vroi,(uint8_t)1); es.output_impedance(true);  printf(clientId, "#ES8388.VROI# 40k\n> "); return; }
   if (strcmp(str, "esvroi off") == 0)  { config.saveValue(&E.es_vroi,(uint8_t)0); es.output_impedance(false); printf(clientId, "#ES8388.VROI# 1.5k\n> "); return; }
-  if (strcmp(str, "eslinein off") == 0) { config.saveValue(&E.es_linein,(uint8_t)ES8388::LINEIN_OFF);  player.applyOutputRouting(); printf(clientId, "#ES8388.LINEIN# off (radio only)\n> "); return; }
-  if (strcmp(str, "eslinein mix") == 0) { config.saveValue(&E.es_linein,(uint8_t)ES8388::LINEIN_MIX);  player.applyOutputRouting(); printf(clientId, "#ES8388.LINEIN# mixed with radio at %d dB\n> ", (int)E.es_linein_gain); return; }
-  if (strcmp(str, "eslinein line") == 0){ config.saveValue(&E.es_linein,(uint8_t)ES8388::LINEIN_ONLY); player.applyOutputRouting(); printf(clientId, "#ES8388.LINEIN# line only (radio muted, DAC path off)\n> "); return; }
+  if (strcmp(str, "eslinein off") == 0) { config.saveValue(&E.es_linein,(uint8_t)ES8388::LINEIN_OFF);  player.applyOutputRouting(); player.refreshOutputPins(); printf(clientId, "#ES8388.LINEIN# off (radio only)\n> "); return; }
+  if (strcmp(str, "eslinein mix") == 0) { config.saveValue(&E.es_linein,(uint8_t)ES8388::LINEIN_MIX);  player.applyOutputRouting(); player.refreshOutputPins(); printf(clientId, "#ES8388.LINEIN# mixed with radio at %d dB\n> ", (int)E.es_linein_gain); return; }
+  if (strcmp(str, "eslinein line") == 0){ config.saveValue(&E.es_linein,(uint8_t)ES8388::LINEIN_ONLY); player.applyOutputRouting(); player.refreshOutputPins(); printf(clientId, "#ES8388.LINEIN# line only (radio muted, DAC path off)\n> "); return; }
   if (strcmp(str, "esadc on") == 0)    { config.saveValue(&E.es_adc,(uint8_t)1); es.adc_power(true);  printf(clientId, "#ES8388.ADC# powered up\n> "); return; }
   if (strcmp(str, "esadc off") == 0)   { config.saveValue(&E.es_adc,(uint8_t)0); es.adc_power(false); printf(clientId, "#ES8388.ADC# powered down\n> "); return; }
   if (strcmp(str, "esmicbias on") == 0){ config.saveValue(&E.es_mic_bias,(uint8_t)1); es.mic_bias(true);  printf(clientId, "#ES8388.MICBIAS# on\n> "); return; }

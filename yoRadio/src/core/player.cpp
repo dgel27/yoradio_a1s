@@ -580,17 +580,37 @@ void Player::prepareForRestart() {
   delay(200);
 }
 
+/* True when line-in is routed to the outputs (mix or line-only).
+   Clamped the same way applyOutputRouting() clamps it, so the two agree on what
+   the stored mode means. */
+bool Player::lineInRouted() const
+{
+    uint8_t m = config.store.es8388.es_linein;
+    return m <= ES8388::LINEIN_ONLY && m != ES8388::LINEIN_OFF;
+}
+
 void Player::setOutputPins(bool isPlaying) {
   if(REAL_LEDBUILTIN!=255) digitalWrite(REAL_LEDBUILTIN, LED_INVERT?!isPlaying:isPlaying);
   // MUTE_VAL is the level that mutes; the user speaker-mute flag forces it.
-  bool ampOn = isPlaying && !_spmute;
+  // The amplifier is also kept on while line-in is routed: line-in is an analog
+  // input that needs no playback, so tying the amp to isPlaying would silence it
+  // the moment the radio is stopped - which made the feature look broken rather
+  // than stopped. With line-in off, behaviour is exactly as before.
+#if ES8388_ENABLE
+  bool keepAmpForLineIn = lineInRouted();
+#else
+  bool keepAmpForLineIn = false;
+#endif
+  bool ampOn = (isPlaying || keepAmpForLineIn) && !_spmute;
   bool _ml = MUTE_LOCK ? !MUTE_VAL : (ampOn ? !MUTE_VAL : MUTE_VAL);
   if(MUTE_PIN!=255) digitalWrite(MUTE_PIN, _ml);
 #if ES8388_ENABLE
   // Optionally park the codec in standby while nothing is playing, and wake it
   // again before the first sample of playback. Driven by the persisted
   // es_standby flag so the user can toggle it without reflashing.
-  if (es_standby_wanted) {
+  // Not while line-in is routed: standby() clears the OUT1/OUT2 enable bits in
+  // DACPOWER, so it would switch off the outputs line-in is playing through.
+  if (es_standby_wanted && !keepAmpForLineIn) {
     if (isPlaying && es_sleeping) {
       es.wake();
       // wake() rewrites DACPOWER to 0x3C and re-enables both analog outputs, so
@@ -602,6 +622,10 @@ void Player::setOutputPins(bool isPlaying) {
     es_sleeping = !isPlaying;
   }
 #endif
+}
+
+void Player::refreshOutputPins() {
+  setOutputPins(_status == PLAYING);
 }
 
 void Player::setSpeakerMute(bool muted) {

@@ -511,6 +511,12 @@ Line-in also needs the codec's analog input buffers powered, which register 3
 leaves switched off at reset. `line_in_mix_mode()` now handles that itself, so
 turning line-in on is all that is required.
 
+**Line-in works with the radio stopped.** The speaker amplifier's enable is
+`MUTE_PIN` (GPIO 21) via R46, which historically followed playback state alone —
+so stopping the radio muted the amplifier and silenced line-in along with it.
+While line-in is routed the amplifier stays enabled regardless of playback, and
+codec standby is skipped for the same reason. With line-in off nothing changes.
+
 **Commands take a space before the number** — `eslinein mix`, `eslingain -12`,
 `esvol1 25`. A bare `esvol1` is rejected rather than being read as `esvol 1`.
 
