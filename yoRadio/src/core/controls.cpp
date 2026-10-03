@@ -11,11 +11,40 @@ long encOldPosition  = 0;
 long enc2OldPosition  = 0;
 int lpId = -1;
 
-#define ISPUSHBUTTONS BTN_LEFT!=255 || BTN_CENTER!=255 || BTN_RIGHT!=255 || ENC_BTNB!=255 || BTN_UP!=255 || BTN_DOWN!=255 || ENC2_BTNB!=255 || BTN_MODE!=255
+#define ISPUSHBUTTONS BTN_LEFT!=255 || BTN_CENTER!=255 || BTN_RIGHT!=255 || ENC_BTNB!=255 || BTN_UP!=255 || BTN_DOWN!=255 || ENC2_BTNB!=255 || BTN_MODE!=255 || KEYS_ADC_PIN!=255
 #if ISPUSHBUTTONS
 #include "../OneButton/OneButton.h"
 OneButton button[] {{BTN_LEFT, true, BTN_INTERNALPULLUP}, {BTN_CENTER, true, BTN_INTERNALPULLUP}, {BTN_RIGHT, true, BTN_INTERNALPULLUP}, {ENC_BTNB, true, ENC_INTERNALPULLUP}, {BTN_UP, true, BTN_INTERNALPULLUP}, {BTN_DOWN, true, BTN_INTERNALPULLUP}, {ENC2_BTNB, true, ENC2_INTERNALPULLUP}, {BTN_MODE, true, BTN_INTERNALPULLUP}};
 constexpr uint8_t nrOfButtons = sizeof(button) / sizeof(button[0]);
+#endif
+
+#if KEYS_ADC_PIN!=255
+// Keys wired as a resistor ladder onto a single ADC input, as on the
+// ESP32-A1S: KEY1..KEY6 share KEY_AD, and pressing one grounds its own tap
+// so each key shows up as a distinct voltage. Only one key at a time is
+// meaningful - two pressed together give a single ambiguous reading.
+//
+// The OneButton objects below are built with pin -1, which makes OneButton's
+// own tick() skip the pin entirely, so they are driven only by the explicit
+// tick(level) in adcKeysLoop(). That keeps the usual click / double-click /
+// long-press behaviour without changing OneButton or the event enum.
+constexpr uint8_t nrOfAdcKeys = 6;
+
+// Event id each ladder key reports as. Edit here to change what a key does.
+// 3 (EVT_ENCBTNB) and 6 (EVT_ENC2BTNB) are left to the encoders on purpose.
+constexpr uint8_t adcKeyEvt[] = {EVT_BTNLEFT, EVT_BTNCENTER, EVT_BTNRIGHT, EVT_BTNUP, EVT_BTNDOWN, EVT_BTNMODE};
+
+// Expected KEY_AD voltage per key, in mV, for the documented ladder
+// (R52 10k pull-up, R54 unpopulated, R55-R59 ladder, R60-R64 1k0 series).
+// Keep in step with the build table in datasheets/ESP32-A1S.
+constexpr uint16_t adcKeyMv[] = {0, 550, 1040, 1554, 2064, 2545};
+constexpr uint16_t adcKeyMvIdle = 3300;
+
+OneButton adcKeys[nrOfAdcKeys] {{-1, true, false}, {-1, true, false}, {-1, true, false}, {-1, true, false}, {-1, true, false}, {-1, true, false}};
+unsigned long adcLastSample = 0;
+int adcPressed = -1;
+void initAdcKeys();
+void adcKeysLoop();
 #endif
 
 #if ENC_HALFQUARD==false
@@ -127,7 +156,58 @@ void initControls() {
   irrecv.setTolerance(config.store.irtlp);
   irrecv.enableIRIn();
 #endif // IR_PIN!=255
+#if KEYS_ADC_PIN!=255
+  initAdcKeys();
+#endif
 }
+
+#if KEYS_ADC_PIN!=255
+void initAdcKeys() {
+  analogSetPinAttenuation(KEYS_ADC_PIN, ADC_11db);
+  for (uint8_t i = 0; i < nrOfAdcKeys; i++) {
+    adcKeys[i].attachClick([](void* p) {
+      onBtnClick((int)p);
+    }, (void*)adcKeyEvt[i]);
+    adcKeys[i].attachDoubleClick([](void* p) {
+      onBtnDoubleClick((int)p);
+    }, (void*)adcKeyEvt[i]);
+    adcKeys[i].attachLongPressStart([](void* p) {
+      onBtnLongPressStart((int)p);
+    }, (void*)adcKeyEvt[i]);
+    adcKeys[i].attachLongPressStop([](void* p) {
+      onBtnLongPressStop((int)p);
+    }, (void*)adcKeyEvt[i]);
+    adcKeys[i].setClickTicks(BTN_CLICK_TICKS);
+    adcKeys[i].setPressTicks(BTN_PRESS_TICKS);
+  }
+}
+
+// Sample the ladder and drive the virtual buttons. loopControls() runs once per
+// loop() with no fixed period, so sample on a timer - OneButton's debounce is
+// compared against milliseconds and would otherwise follow the WiFi load.
+void adcKeysLoop() {
+  unsigned long now = millis();
+  if (now - adcLastSample < KEYS_ADC_SAMPLE_MS) return;
+  adcLastSample = now;
+  uint32_t mv = analogReadMilliVolts(KEYS_ADC_PIN);
+  int hit = -1;
+  for (uint8_t i = 0; i < nrOfAdcKeys; i++) {
+    uint32_t centre = adcKeyMv[i];
+    // Band edges are the midpoints to the neighbouring levels, pulled in by
+    // KEYS_ADC_DEADBAND so a marginal reading is reported as "no key" instead of
+    // being given to one. The top edge of KEY6 is the midpoint to the idle
+    // level, so with nothing pressed the pulled-up pin reads above every band.
+    uint32_t lo = (i == 0) ? 0 : (adcKeyMv[i - 1] + centre) / 2 + KEYS_ADC_DEADBAND;
+    uint32_t next = (i + 1 < nrOfAdcKeys) ? adcKeyMv[i + 1] : adcKeyMvIdle;
+    uint32_t hi = (centre + next) / 2 - KEYS_ADC_DEADBAND;
+    if (lo < hi && mv >= lo && mv < hi) { hit = i; break; }
+  }
+  for (uint8_t i = 0; i < nrOfAdcKeys; i++) {
+    adcKeys[i].tick(i == hit);
+  }
+  adcPressed = hit;
+}
+#endif
 
 void loopControls() {
   if(display.mode()==UPDATING || display.mode()==SDCHANGE) return;
@@ -148,6 +228,16 @@ void loopControls() {
       if (DSP_MODEL == DSP_DUMMY && (lpId == 4 || lpId == 5)) continue;
       onBtnDuringLongPress(lpId);
     }
+  }
+#endif
+#if KEYS_ADC_PIN!=255
+  adcKeysLoop();
+  // Needed when no digital button is configured: the loop above only reaches its
+  // lpId check on indices it did not skip, so with every BTN_* at 255 nothing
+  // would repeat the long press. When a digital button does exist this is a
+  // harmless second call - onBtnDuringLongPress() gates on a shared timestamp.
+  if (adcPressed >= 0 && lpId == adcKeyEvt[adcPressed] && !(DSP_MODEL == DSP_DUMMY && (lpId == 4 || lpId == 5))) {
+    onBtnDuringLongPress(lpId);
   }
 #endif
 #if IR_PIN!=255

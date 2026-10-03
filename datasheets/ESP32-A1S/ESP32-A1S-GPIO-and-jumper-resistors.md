@@ -299,26 +299,69 @@ If you fit a different pull-up, rescale: keep the ratios
 `R55:R56:R57:R58:R59 ≈ 1 : 1.6 : 3.3 : 6.8 : 16` and re-check the two limits
 above rather than reusing these numbers unchanged.
 
-### ⚠ yoRadio cannot read these keys
+### Firmware support for the ladder
 
-Being blunt about this: the change is **hardware-only**. `src/core/controls.cpp`
-reads buttons as discrete digital pins through OneButton, and there is no
-`analogRead` of `KEY_AD` anywhere in the tree — the only `analogRead` calls are
-the backlight and a commented-out seed line.
+yoRadio can read the ladder. It is off by default — with `KEYS_ADC_PIN` at its
+default of 255 none of the code is compiled and the binary is byte-identical to
+before. Turn it on in `myoptions.h`:
 
-So removing R66–R70 buys you five free GPIOs **and five dead keys**. Making the
-ladder work in firmware means adding ADC key scanning: sample GPIO 36, compare
-against thresholds, map to button ids. That is a feature to write, not a flag to
-set — no option in `options.h` enables it.
+```c
+#define KEYS_ADC_PIN        36    // KEY_AD on GPIO36; 255 = disabled
+#define KEYS_ADC_DEADBAND   60    // mV half-window
+#define KEYS_ADC_SAMPLE_MS  10    // sample period
+```
 
-Remove R66–R70 if you want the pins for an encoder, an I2C bus or SPI, and
-accept the keys going dead. Keep them fitted if you would rather have working
-keys and find the pins elsewhere.
+Or copy `examples/myoptions-a1s-adc-keys.h` over `myoptions.h`, which sets the
+ladder pins and the values together.
 
-**If you do build the ladder, the band centres in the build table above are the
-thresholds the firmware needs** — 275 / 795 / 1297 / 1809 / 2304 mV, with roughly
-±60 mV of dead-band around each. Those are the values to implement when ADC key
-scanning is added.
+Three settings, all optional:
+
+| Define | Default | Meaning |
+|---|---|---|
+| `KEYS_ADC_PIN` | 255 | 255 disables. Only 36 is wired to the ladder |
+| `KEYS_ADC_DEADBAND` | 60 | mV each band edge is pulled in by, so a marginal reading reports "no key" rather than being given to one |
+| `KEYS_ADC_SAMPLE_MS` | 10 | sample period; see below for why it must not be free-running |
+
+The expected millivolts live in `adcKeyMv[]` in `src/core/controls.cpp`, one
+entry per key, matching the build table above. That array and the resistor
+values are two halves of the same thing: **if you change the ladder, change that
+array too.** There is no runtime self-calibration.
+
+**Key meanings** default to stock and live in `adcKeyEvt[]`, also in
+`controls.cpp`. Edit that six-entry table to change what a key does:
+
+| Ladder key | Default event | Action |
+|---|---|---|
+| KEY1 | `EVT_BTNLEFT` | previous / volume down |
+| KEY2 | `EVT_BTNCENTER` | play / pause |
+| KEY3 | `EVT_BTNRIGHT` | next / volume up |
+| KEY4 | `EVT_BTNUP` | station up |
+| KEY5 | `EVT_BTNDOWN` | station down |
+| KEY6 | `EVT_BTNMODE` | mode |
+
+Ids 3 and 6 are skipped so they stay with the encoders. With both the ladder and
+an encoder there are two routes to play/pause — KEY2 and the encoder's SW — which
+is deliberate rather than a clash.
+
+**Why the sample period exists.** The keys are driven through `OneButton`, whose
+`tick()` runs once per `loop()` with no fixed period, and whose debounce counter
+is compared against milliseconds. Sampling on a timer makes debounce behaviour
+independent of WiFi load. Raising `KEYS_ADC_SAMPLE_MS` slows response; lowering
+it costs CPU and buys nothing.
+
+**Cost when enabled:** about 7.2 KB of flash and 850 bytes of RAM.
+
+Verified to compile in three configurations — off, on with an encoder, and on
+with every digital button disabled. The band arithmetic was checked to resolve
+all six keys unambiguously under the worst-case ±150 mV ADC error, and to report
+"no key" across the whole idle range. **Not verified on hardware:** the ladder
+was not fitted during development, so the millivolt values are calculated rather
+than measured. Expect to correct `adcKeyMv[]` from a real reading if your board
+disagrees — check each level against `analogReadMilliVolts(36)` with the key held.
+
+Removing R66–R70 while leaving the ladder unbuilt buys you five free GPIOs and
+five dead keys. Building the ladder and setting `KEYS_ADC_PIN` is what makes them
+come back.
 
 ---
 
@@ -385,9 +428,9 @@ the whole VSPI group plus KEY2's pin:
 
 Two consequences:
 
-- **The keys stop working.** They are only reachable through the `KEY_AD`
-  ladder on GPIO 36, and yoRadio has no ADC key support at all — see the note
-  above. This is not reversible in software.
+- **The keys move to the ADC.** They are only reachable through the `KEY_AD`
+  ladder on GPIO 36, so they need the ladder built and `KEYS_ADC_PIN` set — see
+  the firmware section above. Without both they are simply dead.
 - **GPIO 13 stays shared.** It is a three-way DIP (KEY2 / SD DATA3 / JTAG MTCK),
   so removing R66 frees it from the key but the switch still decides its other
   two functions.

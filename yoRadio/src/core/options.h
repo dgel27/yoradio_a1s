@@ -283,6 +283,17 @@ The connection tables are located here https://github.com/e2002/yoradio#connecti
   #define BTN_PRESS_TICKS    500
 #endif
 
+/*   ADC KEYS (resistor ladder on one input)  */
+#ifndef KEYS_ADC_PIN
+  #define KEYS_ADC_PIN           255   // 255 = disabled. GPIO36 on the ESP32-A1S
+#endif
+#ifndef KEYS_ADC_DEADBAND
+  #define KEYS_ADC_DEADBAND      60    // mV half-window around each ladder level
+#endif
+#ifndef KEYS_ADC_SAMPLE_MS
+  #define KEYS_ADC_SAMPLE_MS     10    // sample period; keeps OneButton debounce stable
+#endif
+
 /*        TOUCH SCREEN            */
 #define TS_MODEL_UNDEFINED      0
 #define TS_MODEL_XPT2046        1
