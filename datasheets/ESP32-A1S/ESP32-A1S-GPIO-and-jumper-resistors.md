@@ -496,9 +496,23 @@ From telnet:
 ```
 eslinein off|mix|line   line-in routing
 eslingain <dB>          -15..+6 in 3 dB steps
+eslinsel 0|1            which line-in pair: 0=LIN1/RIN1, 1=LIN2/RIN2
 ```
 
-Both are on the settings page as well, under *Line-in routing* and *Line-in level*.
+`eslinein` and `eslingain` are also on the settings page, under *Line-in routing*
+and *Line-in level*.
+
+**This board needs `eslinsel 1`.** The module's `LINEINL`/`LINEINR` pins reach
+the codec's second line input, not the first, and the carrier schematic cannot
+show that because the module is a black box. It was measured: with the reset
+default (`LIN1/RIN1`) the mixer bits are set correctly and no signal arrives.
+
+Line-in also needs the codec's analog input buffers powered, which register 3
+leaves switched off at reset. `line_in_mix_mode()` now handles that itself, so
+turning line-in on is all that is required.
+
+**Commands take a space before the number** — `eslinein mix`, `eslingain -12`,
+`esvol1 25`. A bare `esvol1` is rejected rather than being read as `esvol 1`.
 
 ---
 

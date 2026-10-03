@@ -264,6 +264,33 @@ void Telnet::info() {
   telnet.printf("> ");
 }
 
+/* Exact command-word matcher for the ES8388 settings.
+   sscanf() is unusable here: its %d skips leading non-digits, so
+   sscanf("esvol %d") happily matches the bare string "esvol1" and yields 1.
+   A user typing "esvol1" to read or set the speaker level therefore silently
+   set the MAIN volume to 1 instead, and "esvol2" to 2. That is a footgun on a
+   setting people actually use, so every ES8388 command below goes through this
+   instead: it requires the word to be followed by whitespace (or nothing at
+   all), so "esvol1" and "esvol1 30" are distinguished and neither can be
+   mistaken for "esvol".
+   Returns the argument parsed, or false when the word does not match. */
+static bool es8388_arg(const char *str, const char *cmd, int &out)
+{
+  size_t n = strlen(cmd);
+  if (strncmp(str, cmd, n) != 0) return false;
+  const char *p = str + n;
+  if (*p != '\0' && *p != ' ') return false;   // "esvol" must not match "esvol1"
+  while (*p == ' ') p++;
+  if (*p == '\0') return false;                 // command with no argument
+  char *end = nullptr;
+  long v = strtol(p, &end, 10);
+  if (end == p) return false;
+  while (*end == ' ') end++;
+  if (*end != '\0') return false;               // trailing junk: not our command
+  out = (int)v;
+  return true;
+}
+
 void Telnet::on_input(const char* str, uint8_t clientId) {
   if (strlen(str) == 0) return;
   if (strcmp(str, "quit") == 0 || strcmp(str, "bye") == 0 || strcmp(str, "exit") == 0) {
@@ -564,39 +591,42 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
 #if ES8388_ENABLE
   uint8_t src, vol;
   int svol;
+  int regnum;
   extern ES8388 es; // single shared instance, owned by player.cpp
   es8388_t &E = config.store.es8388;
-  // NOTE: the specific esvolN / eschNbal forms must be tested BEFORE the
-  // generic "esvol", because sscanf("esvol %d") also matches "esvol1 30".
-  if (sscanf(str, "esvol1 %d", &svol) == 1) {
+  // NOTE: esvolN / eschNbal are checked before the generic "esvol". es8388_arg()
+  // also makes the order irrelevant - it requires the command word to be
+  // followed by a space, so "esvol" cannot match "esvol1 30" - but keeping the
+  // specific forms first is clearer and costs nothing.
+  if (es8388_arg(str, "esvol1", svol)) {
     if (svol < 0) svol = 0; if (svol > 33) svol = 33;
     printf(clientId, "#ES8388.VOL1# set OUT1 (speaker) volume: %d (0-33) \n> ", svol);
     config.saveValue(&E.es_vol1, (uint8_t)svol);
     player.setEs8388Out(ES8388::ES_OUT1, (uint8_t)svol, E.es_bal1);
       return;
   }
-  if (sscanf(str, "esvol2 %d", &svol) == 1) {
+  if (es8388_arg(str, "esvol2", svol)) {
     if (svol < 0) svol = 0; if (svol > 33) svol = 33;
     printf(clientId, "#ES8388.VOL2# set OUT2 (headphone) volume: %d (0-33) \n> ", svol);
     config.saveValue(&E.es_vol2, (uint8_t)svol);
     player.setEs8388Out(ES8388::ES_OUT2, (uint8_t)svol, E.es_bal2);
       return;
   }
-  if (sscanf(str, "esch1bal %d", &svol) == 1) {
+  if (es8388_arg(str, "esch1bal", svol)) {
     if (svol < -6) svol = -6; if (svol > 6) svol = 6;
     printf(clientId, "#ES8388.BAL1# set OUT1 L/R balance: %d (-6..+6) \n> ", svol);
     config.saveValue(&E.es_bal1, (int8_t)svol);
     player.setEs8388Out(ES8388::ES_OUT1, E.es_vol1, (int8_t)svol);
       return;
   }
-  if (sscanf(str, "esch2bal %d", &svol) == 1) {
+  if (es8388_arg(str, "esch2bal", svol)) {
     if (svol < -6) svol = -6; if (svol > 6) svol = 6;
     printf(clientId, "#ES8388.BAL2# set OUT2 L/R balance: %d (-6..+6) \n> ", svol);
     config.saveValue(&E.es_bal2, (int8_t)svol);
     player.setEs8388Out(ES8388::ES_OUT2, E.es_vol2, (int8_t)svol);
       return;
   }
-  if (sscanf(str, "esvol %d", &svol) == 1) {
+  if (es8388_arg(str, "esvol", svol)) {
     if (svol < 0) svol = 0; if (svol > 254) svol = 254;
     // This used to write the DAC master register directly, which now belongs to
     // the main-page volume and would be overwritten by the next slider or
@@ -608,35 +638,35 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
     player.setVol((uint8_t)svol);
       return;
   }
-  if (sscanf(str, "esstereo %d", &svol) == 1) {
+  if (es8388_arg(str, "esstereo", svol)) {
     if (svol < 0) svol = 0; if (svol > 7) svol = 7;
     printf(clientId, "#ES8388.SE# set stereo widening: %d (0-7) \n> ", svol);
     config.saveValue(&E.es_stereo_eff, (uint8_t)svol);
     es.stereo_eff((uint8_t)svol);
       return;
   }
-  if (sscanf(str, "esvpp %d", &svol) == 1) {
+  if (es8388_arg(str, "esvpp", svol)) {
     if (svol < 0) svol = 0; if (svol > 3) svol = 3;
     printf(clientId, "#ES8388.VPP# set DAC Vpp scale: %d (0=3.5V 1=4.0V 2=3.0V 3=2.5V) \n> ", svol);
     config.saveValue(&E.es_vpp, (uint8_t)svol);
     es.vpp_scale((uint8_t)svol);
       return;
   }
-  if (sscanf(str, "esdeemph %d", &svol) == 1) {
+  if (es8388_arg(str, "esdeemph", svol)) {
     if (svol < 0) svol = 0; if (svol > 3) svol = 3;
     printf(clientId, "#ES8388.DEEMPH# set de-emphasis: %d (0=off 1=32k 2=44.1k 3=48k) \n> ", svol);
     config.saveValue(&E.es_deemph, (uint8_t)svol);
     es.deemphasis((uint8_t)svol);
       return;
   }
-  if (sscanf(str, "esmicpga %d", &svol) == 1) {
+  if (es8388_arg(str, "esmicpga", svol)) {
     if (svol < 0) svol = 0; if (svol > 8) svol = 8;
     printf(clientId, "#ES8388.MICPGA# set mic preamp gain: %d (0..8 = 0..+24dB) \n> ", svol);
     config.saveValue(&E.es_mic_pga, (uint8_t)svol);
     es.mic_gain((uint8_t)svol);
       return;
   }
-  if (sscanf(str, "esmicin %d", &svol) == 1) {
+  if (es8388_arg(str, "esmicin", svol)) {
     if (svol < 0) svol = 0; if (svol > 2) svol = 2;
     printf(clientId, "#ES8388.MICIN# set mic input: %d (0=LIN1 1=LIN2 2=diff) \n> ", svol);
     config.saveValue(&E.es_mic_sel, (uint8_t)svol);
@@ -656,7 +686,7 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   if (strcmp(str, "esadc off") == 0)   { config.saveValue(&E.es_adc,(uint8_t)0); es.adc_power(false); printf(clientId, "#ES8388.ADC# powered down\n> "); return; }
   if (strcmp(str, "esmicbias on") == 0){ config.saveValue(&E.es_mic_bias,(uint8_t)1); es.mic_bias(true);  printf(clientId, "#ES8388.MICBIAS# on\n> "); return; }
   if (strcmp(str, "esmicbias off") == 0){config.saveValue(&E.es_mic_bias,(uint8_t)0); es.mic_bias(false); printf(clientId, "#ES8388.MICBIAS# off\n> "); return; }
-  if (sscanf(str, "esramprate %d", &svol) == 1) {
+  if (es8388_arg(str, "esramprate", svol)) {
     if (svol < 0) svol = 0; if (svol > 3) svol = 3;
     printf(clientId, "#ES8388.RAMPRATE# set soft-ramp rate: %d (0-3) \n> ", svol);
     config.saveValue(&E.es_ramp_rate, (uint8_t)svol);
@@ -672,13 +702,13 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   /* Which line-in pair feeds the mixers. Exposed because it is board-dependent
      and unmeasurable from the carrier schematic, so a different module or a
      reworked carrier may need the other one. */
-  if (sscanf(str, "eslinsel %d", &svol) == 1) {
+  if (es8388_arg(str, "eslinsel", svol)) {
     if (svol < 0) svol = 0; if (svol > 1) svol = 1;
     printf(clientId, "#ES8388.LINSEL# line-in pair: %s\n> ", svol ? "LIN2/RIN2" : "LIN1/RIN1");
     es.line_input_select((uint8_t)svol);
     return;
   }
-  if (sscanf(str, "eslingain %d", &svol) == 1) {
+  if (es8388_arg(str, "eslingain", svol)) {
     if (svol < -15) svol = -15; if (svol > 6) svol = 6;
     // Snap to the register's 3 dB grid so the stored value is what actually
     // reaches the chip, not something the slider would have to round.
@@ -692,7 +722,7 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
   if (strcmp(str, "esstandby off") == 0){ config.saveValue(&E.es_standby,(uint8_t)0); player.setEs8388Standby(false); printf(clientId, "#ES8388.STANDBY# off (codec stays awake)\n> "); return; }
   if (strcmp(str, "esspk mute") == 0)  { config.setSpeakerMute(true);  player.setSpeakerMute(true);  printf(clientId, "#ES8388.SPK# muted\n> "); return; }
   if (strcmp(str, "esspk unmute") == 0){ config.setSpeakerMute(false); player.setSpeakerMute(false); printf(clientId, "#ES8388.SPK# unmuted\n> "); return; }
-  if (sscanf(str, "esmute2 %d", &svol) == 1) {
+  if (es8388_arg(str, "esmute2", svol)) {
     // Saved, then pushed through applyOutputRouting() rather than es.mute(), so
     // the jack-detect override stays the arbiter of what reaches the chip.
     config.saveValue(&E.es_mute2, (uint8_t)(svol!=0));
@@ -734,10 +764,13 @@ void Telnet::on_input(const char* str, uint8_t clientId) {
     es.write_reg(ES8388_ADDR, src, vol);
       return;
   }    
-  if (sscanf(str, "esregr %d", &src) == 1) {
+  /* esregr only takes one argument, so it can use the exact matcher. esregw is
+     left on sscanf: it has two numeric arguments, so there is no longer command
+     word for it to be confused with, and strcmp() would just be noise. */
+  if (es8388_arg(str, "esregr", regnum)) {
     uint8_t v;
-    if (es.read_reg(ES8388_ADDR, src, v))
-      printf(clientId, "#ES8388.REGR# reg %d = 0x%02X (%d)\n> ", src, v, v);
+    if (es.read_reg(ES8388_ADDR, regnum, v))
+      printf(clientId, "#ES8388.REGR# reg %d = 0x%02X (%d)\n> ", regnum, v, v);
     else
       printf(clientId, "#ES8388.REGR# read failed\n> ");
       return;
